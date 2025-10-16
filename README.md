@@ -1,66 +1,34 @@
 # Fitzy Monorepo
 
-This repository hosts all Fitzy applications and shared code:
+Fitzy brings together every app that powers our fitness platform. This repo contains the backend API, three web frontends, and the shared SDK they all rely on.
 
-- `apps/backend` – Laravel API powering consumer and admin experiences.
-- `apps/consumer` – consumer-facing React client (now wired to the Fitzy API).
-- `apps/venue-admin` – React portal for venue operators to manage schedules, inventory, and content.
-- `apps/owner-admin` – React portal for Fitzy owners to manage finances, permissions, and reporting.
-- `packages/shared-sdk` – shared TypeScript/JavaScript SDK that wraps the Laravel API for all frontends.
+## Structure
+- `apps/backend` – Laravel API for bookings, memberships, and payments.
+- `apps/consumer` – React/Vite consumer experience.
+- `apps/venue-admin` – Venue management dashboard.
+- `apps/owner-admin` – Ownership and finance dashboard.
+- `packages/shared-sdk` – Shared HTTP client for the API.
 
-## Getting Started
+## Quick Start
+```bash
+git clone https://github.com/your-org/fitzy.git
+cd fitzy
+npm install
+```
 
-1. **Install dependencies**
+Boot servers:
+- API: `cd apps/backend && composer install && php artisan serve`
+- Consumer web: `npm run dev --workspace consumer`
+- Venue admin: `npm run dev --workspace venue-admin`
+- Owner admin: `npm run dev --workspace owner-admin`
 
-   ```bash
-   npm install
-   npm install --workspaces
-   ```
-
-   Alternatively, install per workspace:
-
-   ```bash
-   cd apps/backend && composer install && npm install
-   cd apps/consumer && npm install
-   cd apps/venue-admin && npm install
-   cd apps/owner-admin && npm install
-   ```
-
-2. **Database & seed data**
-
-   ```bash
-   cd apps/backend
-   touch database/database.sqlite
-   php artisan migrate --seed
-   ```
-
-   The seeder provisions demo venues, class types, sessions, packages, payment methods, and an owner account (`test@example.com` / `password`).
-
-3. **Local development**
-
-   - API: `cd apps/backend && php artisan serve`
-   - Consumer web: `npm run dev --workspace consumer`
-   - Venue admin: `npm run dev --workspace venue-admin`
-   - Owner admin: `npm run dev --workspace owner-admin`
-
-   The frontends expect `VITE_API_BASE_URL` (default `http://localhost:8000/api`). Optional demo auto-login overrides:
-
-   ```bash
-   VITE_FITZY_DEMO_EMAIL=test@example.com
-   VITE_FITZY_DEMO_PASSWORD=password
-   ```
-
-## Base44 Migration Checklist
-
-- [x] Build native Laravel endpoints covering sessions, venues, bookings, packages, payments, favorites, and waitlists.
-- [x] Implement a shared HTTP client in `packages/shared-sdk` targeting the Laravel API (auth via Sanctum).
-- [x] Swap the consumer app to the shared client and remove `@base44/sdk`; extend the new admin portals using the same SDK next.
+Frontends expect `VITE_API_BASE_URL` (defaults to `http://localhost:8000/api`). Seed demo data with `php artisan migrate --seed` for the backend.
 
 ## Scripts
+- `npm run dev:consumer`, `npm run dev:venue`, `npm run dev:owner`
+- `npm run build` builds every workspace.
 
-- `npm run build` – build every workspace sequentially.
-- `npm run dev:consumer` – start consumer Vite dev server.
-- `npm run dev:venue` – start venue admin Vite dev server.
-- `npm run dev:owner` – start owner admin Vite dev server.
-
-Feel free to add additional shared packages under `packages/` as the platform grows.
+## Notes
+- Keep shared logic in `packages/shared-sdk`.
+- React Query is already configured—use it for new data fetching.
+- Report issues or open pull requests in this repo. Every app lives here.
