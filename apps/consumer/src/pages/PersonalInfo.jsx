@@ -8,15 +8,21 @@ export default function PersonalInfoPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  const { data: user } = useQuery({
+  const {
+    data: user,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => fitzy.auth.me(),
+    retry: false,
   });
 
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     phone: "",
+    email: "",
   });
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [profilePicPreview, setProfilePicPreview] = useState("");
@@ -27,6 +33,7 @@ export default function PersonalInfoPage() {
         first_name: user.first_name || "",
         last_name: user.last_name || "",
         phone: user.phone || "",
+        email: user.email || "",
       });
       setProfilePicPreview(user.profile_picture_url || "");
     }
@@ -65,7 +72,9 @@ export default function PersonalInfoPage() {
     updateUserMutation.mutate(formData);
   };
 
-  if (!user) return <div className="min-h-screen pt-20 px-4">Loading...</div>;
+  if (isLoading) {
+    return <div className="min-h-screen pt-20 px-4">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen pt-20 pb-8 px-4">
@@ -79,6 +88,12 @@ export default function PersonalInfoPage() {
         <h1 className="text-3xl font-bold text-gray-900">Personal Info</h1>
       </div>
 
+      {isError && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          We couldn&apos;t reach the Fitzy API right now. You can still review your details, but saving will require the backend to be online.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Picture */}
         <div className="flex flex-col items-center">
@@ -88,7 +103,7 @@ export default function PersonalInfoPage() {
                 <img src={profilePicPreview} alt="Profile Preview" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-white text-5xl font-bold">
-                  {user.first_name?.[0] || 'U'}
+                  {formData.first_name?.[0] || 'U'}
                 </div>
               )}
             </div>
@@ -142,7 +157,7 @@ export default function PersonalInfoPage() {
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="email"
-              value={user.email}
+              value={formData.email}
               disabled
               className="w-full pl-12 pr-4 py-4 bg-gray-100 text-gray-500 rounded-2xl border-2 border-gray-200 cursor-not-allowed"
             />
