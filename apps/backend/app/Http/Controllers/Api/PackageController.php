@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Package;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\PackageStoreRequest;
+use App\Http\Requests\PackageUpdateRequest;
 
 class PackageController extends Controller
 {
@@ -23,9 +25,9 @@ class PackageController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(PackageStoreRequest $request): JsonResponse
     {
-        $data = $this->validatedData($request);
+        $data = $request->validated();
 
         $package = Package::create($data);
 
@@ -37,9 +39,9 @@ class PackageController extends Controller
         return response()->json($package->load('venue'));
     }
 
-    public function update(Request $request, Package $package): JsonResponse
+    public function update(PackageUpdateRequest $request, Package $package): JsonResponse
     {
-        $data = $this->validatedData($request, partial: true);
+        $data = $request->validated();
 
         $package->fill($data)->save();
 
@@ -53,18 +55,4 @@ class PackageController extends Controller
         return response()->json(status: 204);
     }
 
-    protected function validatedData(Request $request, bool $partial = false): array
-    {
-        $rules = [
-            'name' => [$partial ? 'sometimes' : 'required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'credits' => ['nullable', 'integer', 'min:0'],
-            'validity_months' => ['nullable', 'integer', 'min:0'],
-            'category_name' => ['nullable', 'string', 'max:255'],
-            'venue_id' => ['nullable', 'exists:venues,id'],
-        ];
-
-        return $request->validate($rules);
-    }
 }

@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\WaitlistEntry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\WaitlistEntryStoreRequest;
+use App\Http\Requests\WaitlistEntryUpdateRequest;
 
 class WaitlistEntryController extends Controller
 {
@@ -23,13 +25,9 @@ class WaitlistEntryController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(WaitlistEntryStoreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
-            'session_id' => ['required', 'exists:class_sessions,id'],
-            'status' => ['nullable', 'string', 'max:50'],
-        ]);
+        $data = $request->validated();
 
         $entry = WaitlistEntry::firstOrCreate(
             [
@@ -44,11 +42,9 @@ class WaitlistEntryController extends Controller
         return response()->json($entry->fresh(['session', 'session.venue']), $entry->wasRecentlyCreated ? 201 : 200);
     }
 
-    public function update(Request $request, WaitlistEntry $waitlistEntry): JsonResponse
+    public function update(WaitlistEntryUpdateRequest $request, WaitlistEntry $waitlistEntry): JsonResponse
     {
-        $data = $request->validate([
-            'status' => ['sometimes', 'string', 'max:50'],
-        ]);
+        $data = $request->validated();
 
         $waitlistEntry->fill($data)->save();
 

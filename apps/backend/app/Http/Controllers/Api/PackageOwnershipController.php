@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\PackageOwnership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\PackageOwnershipStoreRequest;
+use App\Http\Requests\PackageOwnershipUpdateRequest;
 
 class PackageOwnershipController extends Controller
 {
@@ -23,9 +25,9 @@ class PackageOwnershipController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(PackageOwnershipStoreRequest $request): JsonResponse
     {
-        $data = $this->validatedData($request);
+        $data = $request->validated();
 
         $ownership = PackageOwnership::create($data);
 
@@ -37,9 +39,9 @@ class PackageOwnershipController extends Controller
         return response()->json($packageOwnership->load(['package', 'package.venue']));
     }
 
-    public function update(Request $request, PackageOwnership $packageOwnership): JsonResponse
+    public function update(PackageOwnershipUpdateRequest $request, PackageOwnership $packageOwnership): JsonResponse
     {
-        $data = $this->validatedData($request, partial: true);
+        $data = $request->validated();
 
         if (array_key_exists('credits_remaining', $data)) {
             $data['credits_remaining'] = max(0, $data['credits_remaining']);
@@ -55,20 +57,5 @@ class PackageOwnershipController extends Controller
         $packageOwnership->delete();
 
         return response()->json(status: 204);
-    }
-
-    protected function validatedData(Request $request, bool $partial = false): array
-    {
-        $rules = [
-            'user_id' => [$partial ? 'sometimes' : 'required', 'exists:users,id'],
-            'package_id' => [$partial ? 'sometimes' : 'required', 'exists:packages,id'],
-            'credits_total' => ['nullable', 'integer', 'min:0'],
-            'credits_remaining' => ['nullable', 'integer', 'min:0'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'purchased_at' => ['nullable', 'date'],
-            'expires_at' => ['nullable', 'date'],
-        ];
-
-        return $request->validate($rules);
     }
 }

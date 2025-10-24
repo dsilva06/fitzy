@@ -8,6 +8,8 @@ use App\Models\Booking;
 use App\Models\ClassSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\BookingStoreRequest;
+use App\Http\Requests\BookingUpdateRequest;
 use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
@@ -25,14 +27,9 @@ class BookingController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(BookingStoreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
-            'session_id' => ['required', 'exists:class_sessions,id'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'cancellation_deadline' => ['nullable', 'date'],
-        ]);
+        $data = $request->validated();
 
         $booking = DB::transaction(function () use ($data) {
             $booking = Booking::firstOrCreate(
@@ -57,12 +54,9 @@ class BookingController extends Controller
         return response()->json($booking->load(['session', 'session.venue', 'session.classType']));
     }
 
-    public function update(Request $request, Booking $booking): JsonResponse
+    public function update(BookingUpdateRequest $request, Booking $booking): JsonResponse
     {
-        $data = $request->validate([
-            'status' => ['sometimes', 'string', 'max:50'],
-            'cancellation_deadline' => ['nullable', 'date'],
-        ]);
+        $data = $request->validated();
 
         $booking->fill($data)->save();
 

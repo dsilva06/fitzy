@@ -8,6 +8,8 @@ use App\Models\PaymentMethod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Http\Requests\PaymentMethodStoreRequest;
+use App\Http\Requests\PaymentMethodUpdateRequest;
 
 class PaymentMethodController extends Controller
 {
@@ -15,24 +17,36 @@ class PaymentMethodController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = PaymentMethod::query();
+        $user = $request->user();
 
-        $this->applyFilters($query, $request, ['id', 'user_id', 'type', 'is_default']);
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        $query = $user->paymentMethods()->newQuery();
+
+        $this->applyFilters($query, $request, ['id', 'type', 'is_default']);
         $this->applySorting($query, $request, ['created_at'], 'created_at');
         $this->applyLimit($query, $request);
 
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(PaymentMethodStoreRequest $request): JsonResponse
     {
-        $data = $this->validatedData($request);
+        $data = $request->validated();
+        $user = $request->user();
 
-        $paymentMethod = DB::transaction(function () use ($data) {
-            $method = PaymentMethod::create($data);
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        $paymentMethod = DB::transaction(function () use ($user, $data) {
+            /** @var \App\Models\PaymentMethod $method */
+            $method = $user->paymentMethods()->create($data);
 
             if ($method->is_default) {
-                PaymentMethod::where('user_id', $method->user_id)
+                PaymentMethod::where('user_id', $user->id)
                     ->where('id', '!=', $method->id)
                     ->update(['is_default' => false]);
             }
@@ -43,14 +57,34 @@ class PaymentMethodController extends Controller
         return response()->json($paymentMethod, 201);
     }
 
-    public function show(PaymentMethod $paymentMethod): JsonResponse
+    public function show(Request $request, PaymentMethod $paymentMethod): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if ($paymentMethod->user_id !== $user->id) {
+            abort(403, 'You are not authorized to view this payment method.');
+        }
+
         return response()->json($paymentMethod);
     }
 
-    public function update(Request $request, PaymentMethod $paymentMethod): JsonResponse
+    public function update(PaymentMethodUpdateRequest $request, PaymentMethod $paymentMethod): JsonResponse
     {
-        $data = $this->validatedData($request, partial: true);
+        $user = $request->user();
+
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if ($paymentMethod->user_id !== $user->id) {
+            abort(403, 'You are not authorized to update this payment method.');
+        }
+
+        $data = $request->validated();
 
         DB::transaction(function () use ($paymentMethod, $data) {
             $paymentMethod->fill($data)->save();
@@ -65,34 +99,20 @@ class PaymentMethodController extends Controller
         return response()->json($paymentMethod->fresh());
     }
 
-    public function destroy(PaymentMethod $paymentMethod): JsonResponse
+    public function destroy(Request $request, PaymentMethod $paymentMethod): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if ($paymentMethod->user_id !== $user->id) {
+            abort(403, 'You are not authorized to delete this payment method.');
+        }
+
         $paymentMethod->delete();
 
         return response()->json(status: 204);
-    }
-
-    protected function validatedData(Request $request, bool $partial = false): array
-    {
-        $rules = [
-            'user_id' => [$partial ? 'sometimes' : 'required', 'exists:users,id'],
-            'type' => [$partial ? 'sometimes' : 'required', 'string', 'max:50'],
-            'card_brand' => ['nullable', 'string', 'max:100'],
-            'masked_details' => ['nullable', 'string', 'max:255'],
-            'card_expiry' => ['nullable', 'string', 'max:10'],
-            'account_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'is_default' => ['nullable', 'boolean'],
-            'meta' => ['nullable', 'array'],
-        ];
-
-        $data = $request->validate($rules);
-
-        if (array_key_exists('is_default', $data)) {
-            $data['is_default'] = (bool) $data['is_default'];
-        }
-
-        return $data;
     }
 }

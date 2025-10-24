@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\PaymentStoreRequest;
+use App\Http\Requests\PaymentUpdateRequest;
 
 class PaymentController extends Controller
 {
@@ -23,15 +25,9 @@ class PaymentController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(PaymentStoreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'booking_id' => ['required', 'exists:bookings,id'],
-            'method' => ['required', 'string', 'max:50'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'status' => ['nullable', 'string', 'max:50'],
-            'meta' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
         $payment = Payment::create([
             'booking_id' => $data['booking_id'],
@@ -49,12 +45,9 @@ class PaymentController extends Controller
         return response()->json($payment->load('booking'));
     }
 
-    public function update(Request $request, Payment $payment): JsonResponse
+    public function update(PaymentUpdateRequest $request, Payment $payment): JsonResponse
     {
-        $data = $request->validate([
-            'status' => ['sometimes', 'string', 'max:50'],
-            'meta' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
         $payment->fill($data)->save();
 

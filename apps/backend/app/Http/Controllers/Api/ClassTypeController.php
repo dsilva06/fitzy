@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\ClassTypeStoreRequest;
+use App\Http\Requests\ClassTypeUpdateRequest;
 
 class ClassTypeController extends Controller
 {
@@ -23,12 +25,9 @@ class ClassTypeController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(ClassTypeStoreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $classType = ClassType::create($data);
 
@@ -40,12 +39,9 @@ class ClassTypeController extends Controller
         return response()->json($classType);
     }
 
-    public function update(Request $request, ClassType $classType): JsonResponse
+    public function update(ClassTypeUpdateRequest $request, ClassType $classType): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $classType->fill($data)->save();
 

@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import LiveCardPreview from '../LiveCardPreview';
 import { Lock, Loader2 } from 'lucide-react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from '@/components/ui/input';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { COUNTRIES, COUNTRY_CONFIG_MAP } from './countryData';
 
 const detectCardBrand = (number) => {
     const n = number.replace(/\D/g, '');
@@ -27,8 +28,26 @@ const formatExpiry = (value) => {
     return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2').slice(0, 5);
 };
 
-const validateForm = ({ cardNumber, expiry, cvc, cardholderName, zip }) => {
+const fallbackCountryConfig = {
+    requiresBilling: false,
+    requiresPostalCode: true,
+    postalCodeLabel: 'Postal Code',
+    regionLabel: 'State / Region',
+    requiresRegion: false,
+};
+
+const validateForm = (form, countryConfig = fallbackCountryConfig) => {
     const errors = {};
+    const {
+        cardNumber,
+        expiry,
+        cvc,
+        cardholderName,
+        postalCode,
+        addressLine1,
+        city,
+        region,
+    } = form;
     const brand = detectCardBrand(cardNumber);
     const rawCardNumber = cardNumber.replace(/\D/g, '');
     const rawExpiry = expiry.replace(/\D/g, '');
@@ -50,15 +69,37 @@ const validateForm = ({ cardNumber, expiry, cvc, cardholderName, zip }) => {
         if (month < 1 || month > 12) errors.expiry = 'Invalid month.';
         else if (year < currentYear || (year === currentYear && month < currentMonth)) errors.expiry = 'Card is expired.';
     }
-    if (!zip.trim()) errors.zip = 'ZIP code is required.';
+    if (countryConfig.requiresBilling) {
+        if (!addressLine1.trim()) errors.addressLine1 = 'Street address is required.';
+        if (!city.trim()) errors.city = 'City is required.';
+        if (countryConfig.requiresRegion && !region.trim()) errors.region = `${countryConfig.regionLabel} is required.`;
+    }
+    if (countryConfig.requiresPostalCode && !postalCode.trim()) errors.postalCode = `${countryConfig.postalCodeLabel} is required.`;
 
     return errors;
 };
 
 export default function CardForm({ onSave, isSubmitting }) {
-    const [form, setForm] = useState({ cardholderName: '', cardNumber: '', expiry: '', cvc: '', country: 'US', zip: '', isDefault: false });
+    const [form, setForm] = useState({
+        cardholderName: '',
+        cardNumber: '',
+        expiry: '',
+        cvc: '',
+        country: 'US',
+        postalCode: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        region: '',
+        isDefault: false,
+    });
     const [errors, setErrors] = useState({});
     const [cardBrand, setCardBrand] = useState('unknown');
+
+    const countryConfig = useMemo(
+        () => COUNTRY_CONFIG_MAP[form.country] || fallbackCountryConfig,
+        [form.country]
+    );
 
     useEffect(() => {
         const newBrand = detectCardBrand(form.cardNumber);
@@ -66,8 +107,8 @@ export default function CardForm({ onSave, isSubmitting }) {
     }, [form.cardNumber]);
     
     useEffect(() => {
-        setErrors(validateForm(form));
-    }, [form]);
+        setErrors(validateForm(form, countryConfig));
+    }, [form, countryConfig]);
 
     const handleChange = (e) => {
         let { name, value } = e.target;
@@ -81,19 +122,44 @@ export default function CardForm({ onSave, isSubmitting }) {
     };
     
     const handleSaveClick = () => {
-        const currentErrors = validateForm(form);
+        const currentErrors = validateForm(form, countryConfig);
         setErrors(currentErrors);
         if (Object.keys(currentErrors).length === 0) {
+            const rawCardNumber = form.cardNumber.replace(/\D/g, '');
+            const lastFour = rawCardNumber.slice(-4);
+            const billingDetails = { country: form.country };
+
+            if (countryConfig.requiresBilling) {
+                billingDetails.address_line1 = form.addressLine1.trim();
+                if (form.addressLine2.trim()) billingDetails.address_line2 = form.addressLine2.trim();
+                billingDetails.city = form.city.trim();
+                if (countryConfig.requiresRegion || form.region.trim()) billingDetails.region = form.region.trim();
+            }
+            if (countryConfig.requiresPostalCode && form.postalCode.trim()) {
+                billingDetails.postal_code = form.postalCode.trim();
+            }
+
+            const meta = {
+                cardholder_name: form.cardholderName.trim(),
+                billing_address: billingDetails,
+                requires_billing: countryConfig.requiresBilling,
+                requires_postal_code: countryConfig.requiresPostalCode,
+            };
+
+            const maskedDetails = lastFour && lastFour.length === 4 ? `**** **** **** ${lastFour}` : '**** **** **** ****';
+
             onSave({
                 card_brand: cardBrand,
-                masked_details: `**** **** **** ${form.cardNumber.slice(-4)}`,
+                masked_details: maskedDetails,
                 card_expiry: form.expiry,
-                is_default: form.isDefault
+                is_default: form.isDefault,
+                meta,
             });
         }
     };
 
-    const isValid = Object.keys(validateForm(form)).length === 0;
+    const isValid = Object.keys(errors).length === 0;
+    const showStandalonePostalField = !countryConfig.requiresBilling && countryConfig.requiresPostalCode;
 
     return (
         <div className="p-6 space-y-6">
@@ -107,20 +173,39 @@ export default function CardForm({ onSave, isSubmitting }) {
                     <InputField name="cvc" label="CVC" value={form.cvc} onChange={handleChange} error={errors.cvc} containerClassName="flex-1" icon={<Lock className="w-4 h-4 text-gray-400"/>} />
                 </div>
                 <div className="flex gap-4">
-                        <div className="flex-1">
-                        <Select value={form.country} onValueChange={(value) => setForm(p => ({...p, country: value}))}>
+                    <div className="flex-1">
+                        <Select value={form.country} onValueChange={(value) => setForm(p => ({ ...p, country: value }))}>
                             <SelectTrigger className="w-full h-12 text-base">
                                 <SelectValue placeholder="Country" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="US">United States</SelectItem>
-                                <SelectItem value="CA">Canada</SelectItem>
-                                <SelectItem value="VE">Venezuela</SelectItem>
+                                {COUNTRIES.map(country => (
+                                    <SelectItem key={country.code} value={country.code}>
+                                        {country.name}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
-                    <InputField name="zip" label="ZIP Code" value={form.zip} onChange={handleChange} error={errors.zip} containerClassName="flex-1" />
+                    {showStandalonePostalField && (
+                        <InputField
+                            name="postalCode"
+                            label={countryConfig.postalCodeLabel}
+                            value={form.postalCode}
+                            onChange={handleChange}
+                            error={errors.postalCode}
+                            containerClassName="flex-1"
+                        />
+                    )}
                 </div>
+                {countryConfig.requiresBilling && (
+                    <BillingAddressFields
+                        form={form}
+                        errors={errors}
+                        onChange={handleChange}
+                        countryConfig={countryConfig}
+                    />
+                )}
 
                 <div className="flex items-center space-x-2 pt-2">
                     <Checkbox id="isDefaultCard" checked={form.isDefault} onCheckedChange={(checked) => setForm(prev => ({...prev, isDefault: checked}))} />
@@ -152,3 +237,52 @@ const InputField = ({ name, label, value, onChange, error, icon, containerClassN
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
 );
+
+const BillingAddressFields = ({ form, errors, onChange, countryConfig }) => {
+    return (
+        <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-sm font-semibold text-gray-700">Billing address</p>
+            <InputField
+                name="addressLine1"
+                label="Street Address"
+                value={form.addressLine1}
+                onChange={onChange}
+                error={errors.addressLine1}
+            />
+            <InputField
+                name="addressLine2"
+                label="Apartment, suite, etc. (optional)"
+                value={form.addressLine2}
+                onChange={onChange}
+                error={errors.addressLine2}
+            />
+            <div className="flex gap-4">
+                <InputField
+                    name="city"
+                    label="City"
+                    value={form.city}
+                    onChange={onChange}
+                    error={errors.city}
+                    containerClassName="flex-1"
+                />
+                <InputField
+                    name="region"
+                    label={countryConfig.requiresRegion ? countryConfig.regionLabel : `${countryConfig.regionLabel} (optional)`}
+                    value={form.region}
+                    onChange={onChange}
+                    error={errors.region}
+                    containerClassName="flex-1"
+                />
+            </div>
+            {countryConfig.requiresPostalCode && (
+                <InputField
+                    name="postalCode"
+                    label={countryConfig.postalCodeLabel}
+                    value={form.postalCode}
+                    onChange={onChange}
+                    error={errors.postalCode}
+                />
+            )}
+        </div>
+    );
+};

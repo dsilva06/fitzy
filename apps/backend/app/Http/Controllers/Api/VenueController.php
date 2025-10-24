@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Venue;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\VenueStoreRequest;
+use App\Http\Requests\VenueUpdateRequest;
 
 class VenueController extends Controller
 {
@@ -23,17 +25,9 @@ class VenueController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(VenueStoreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'neighborhood' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'logo_url' => ['nullable', 'string'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $venue = Venue::create($data);
 
@@ -45,17 +39,9 @@ class VenueController extends Controller
         return response()->json($venue);
     }
 
-    public function update(Request $request, Venue $venue): JsonResponse
+    public function update(VenueUpdateRequest $request, Venue $venue): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'neighborhood' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'logo_url' => ['nullable', 'string'],
-            'description' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $venue->fill($data)->save();
 

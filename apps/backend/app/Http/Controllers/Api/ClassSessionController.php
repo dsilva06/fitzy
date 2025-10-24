@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Requests\ClassSessionStoreRequest;
+use App\Http\Requests\ClassSessionUpdateRequest;
 
 class ClassSessionController extends Controller
 {
@@ -23,9 +25,9 @@ class ClassSessionController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(ClassSessionStoreRequest $request): JsonResponse
     {
-        $data = $this->validatedData($request);
+        $data = $request->validated();
 
         $session = ClassSession::create($data);
 
@@ -37,9 +39,9 @@ class ClassSessionController extends Controller
         return response()->json($classSession->load(['venue', 'classType']));
     }
 
-    public function update(Request $request, ClassSession $classSession): JsonResponse
+    public function update(ClassSessionUpdateRequest $request, ClassSession $classSession): JsonResponse
     {
-        $data = $this->validatedData($request, partial: true);
+        $data = $request->validated();
 
         if (array_key_exists('capacity_taken', $data)) {
             $data['capacity_taken'] = max(0, min(
@@ -60,23 +62,4 @@ class ClassSessionController extends Controller
         return response()->json(status: 204);
     }
 
-    protected function validatedData(Request $request, bool $partial = false): array
-    {
-        $rules = [
-            'venue_id' => [$partial ? 'sometimes' : 'required', 'exists:venues,id'],
-            'class_type_id' => [$partial ? 'sometimes' : 'required', 'exists:class_types,id'],
-            'name' => [$partial ? 'sometimes' : 'required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'coach_name' => ['nullable', 'string', 'max:255'],
-            'start_datetime' => [$partial ? 'sometimes' : 'required', 'date'],
-            'end_datetime' => [$partial ? 'sometimes' : 'required', 'date', 'after:start_datetime'],
-            'capacity_total' => ['nullable', 'integer', 'min:0'],
-            'capacity_taken' => ['nullable', 'integer', 'min:0'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'credit_cost' => ['nullable', 'integer', 'min:0'],
-            'level' => ['nullable', 'string', 'max:255'],
-        ];
-
-        return $request->validate($rules);
-    }
 }
