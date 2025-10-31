@@ -19,6 +19,7 @@ class ClassSessionUpdateRequest extends FormRequest
         return [
             'venue_id' => ['sometimes', 'exists:venues,id'],
             'class_type_id' => ['sometimes', 'exists:class_types,id'],
+            'instructor_id' => ['sometimes', 'nullable', 'exists:venue_instructors,id'],
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'coach_name' => ['nullable', 'string', 'max:255'],

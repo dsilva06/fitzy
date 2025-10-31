@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\InteractsWithQueryParameters;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\ClassSessionStoreRequest;
@@ -16,11 +17,48 @@ class ClassSessionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = ClassSession::with(['venue', 'classType']);
+        $query = ClassSession::with([
+            'venue',
+            'classType',
+            'instructor',
+            'waitlistEntries' => function ($q) {
+                $q->where('status', 'active')
+                    ->orderBy('created_at')
+                    ->with('user:id,first_name,last_name,name,email');
+            },
+        ])->withCount([
+            'bookings as bookings_confirmed_count' => function ($q) {
+                $q->where('status', 'confirmed');
+            },
+            'waitlistEntries as waitlist_active_count' => function ($q) {
+                $q->where('status', 'active');
+            },
+        ]);
 
         $this->applyFilters($query, $request, ['id', 'venue_id', 'class_type_id']);
         $this->applySorting($query, $request, ['start_datetime', 'end_datetime', 'created_at'], 'start_datetime');
         $this->applyLimit($query, $request);
+
+        if ($request->filled('venue')) {
+            $venue = $request->query('venue');
+            $query->whereHas('venue', fn ($q) => $q->where('name', $venue));
+        }
+
+        if ($request->filled('month')) {
+            $month = CarbonImmutable::parse($request->query('month'));
+            $query->whereBetween('start_datetime', [
+                $month->startOfMonth(),
+                $month->endOfMonth(),
+            ]);
+        }
+
+        if ($request->filled('date')) {
+            $date = CarbonImmutable::parse($request->query('date'));
+            $query->whereBetween('start_datetime', [
+                $date->startOfDay(),
+                $date->endOfDay(),
+            ]);
+        }
 
         return response()->json($query->get());
     }
@@ -31,12 +69,55 @@ class ClassSessionController extends Controller
 
         $session = ClassSession::create($data);
 
-        return response()->json($session->fresh(['venue', 'classType']), 201);
+        if (! empty($data['instructor_id']) && empty($data['coach_name'])) {
+            $session->coach_name = $session->instructor?->name;
+            $session->save();
+        }
+
+        $session->load([
+            'venue',
+            'classType',
+            'instructor',
+            'waitlistEntries' => function ($q) {
+                $q->where('status', 'active')
+                    ->orderBy('created_at')
+                    ->with('user:id,first_name,last_name,name,email');
+            },
+        ])
+            ->loadCount([
+                'bookings as bookings_confirmed_count' => function ($q) {
+                    $q->where('status', 'confirmed');
+                },
+                'waitlistEntries as waitlist_active_count' => function ($q) {
+                    $q->where('status', 'active');
+                },
+            ]);
+
+        return response()->json($session, 201);
     }
 
     public function show(ClassSession $classSession): JsonResponse
     {
-        return response()->json($classSession->load(['venue', 'classType']));
+        $classSession->load([
+            'venue',
+            'classType',
+            'instructor',
+            'waitlistEntries' => function ($q) {
+                $q->where('status', 'active')
+                    ->orderBy('created_at')
+                    ->with('user:id,first_name,last_name,name,email');
+            },
+        ])
+            ->loadCount([
+                'bookings as bookings_confirmed_count' => function ($q) {
+                    $q->where('status', 'confirmed');
+                },
+                'waitlistEntries as waitlist_active_count' => function ($q) {
+                    $q->where('status', 'active');
+                },
+            ]);
+
+        return response()->json($classSession);
     }
 
     public function update(ClassSessionUpdateRequest $request, ClassSession $classSession): JsonResponse
@@ -52,7 +133,31 @@ class ClassSessionController extends Controller
 
         $classSession->fill($data)->save();
 
-        return response()->json($classSession->fresh(['venue', 'classType']));
+        if (array_key_exists('instructor_id', $data) && empty($data['coach_name'])) {
+            $classSession->coach_name = $classSession->instructor?->name;
+            $classSession->save();
+        }
+
+        $classSession->load([
+            'venue',
+            'classType',
+            'instructor',
+            'waitlistEntries' => function ($q) {
+                $q->where('status', 'active')
+                    ->orderBy('created_at')
+                    ->with('user:id,first_name,last_name,name,email');
+            },
+        ])
+            ->loadCount([
+                'bookings as bookings_confirmed_count' => function ($q) {
+                    $q->where('status', 'confirmed');
+                },
+                'waitlistEntries as waitlist_active_count' => function ($q) {
+                    $q->where('status', 'active');
+                },
+            ]);
+
+        return response()->json($classSession);
     }
 
     public function destroy(ClassSession $classSession): JsonResponse

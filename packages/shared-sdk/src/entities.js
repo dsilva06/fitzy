@@ -123,6 +123,15 @@ function createEntitiesApi(http) {
     delete: (id) => destroy('/favorites', id),
   };
 
+  const VenueInstructor = {
+    list: (order, limit) => list('/instructors', {}, order, limit),
+    filter: (filters = {}, order, limit) => list('/instructors', filters, order, limit),
+    show: (id) => retrieve('/instructors', id),
+    create: (payload) => create('/instructors', payload),
+    update: (id, payload) => update('/instructors', id, payload),
+    delete: (id) => destroy('/instructors', id),
+  };
+
   return {
     Venue,
     ClassType,
@@ -134,6 +143,7 @@ function createEntitiesApi(http) {
     PaymentMethod,
     Payment,
     Favorite,
+    VenueInstructor,
   };
 }
 

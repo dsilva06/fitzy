@@ -12,6 +12,7 @@ use App\Models\Favorite;
 use App\Models\PaymentMethod;
 use App\Models\PackageOwnership;
 use App\Models\WaitlistEntry;
+use App\Models\Venue;
 
 class User extends Authenticatable
 {
@@ -32,6 +33,7 @@ class User extends Authenticatable
         'profile_picture_url',
         'role',
         'password',
+        'venue_id',
     ];
 
     /**
@@ -80,5 +82,10 @@ class User extends Authenticatable
     public function waitlistEntries()
     {
         return $this->hasMany(WaitlistEntry::class);
+    }
+
+    public function venue()
+    {
+        return $this->belongsTo(Venue::class);
     }
 }

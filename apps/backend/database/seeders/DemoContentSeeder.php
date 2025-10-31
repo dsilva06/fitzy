@@ -11,6 +11,7 @@ use App\Models\PackageOwnership;
 use App\Models\PaymentMethod;
 use App\Models\Venue;
 use App\Models\WaitlistEntry;
+use App\Models\VenueInstructor;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -70,6 +71,23 @@ class DemoContentSeeder extends Seeder
             return [$venue->name => $venue];
         });
 
+        $owner->update([
+            'venue_id' => $venues['Pulse Fitness Studio']->id,
+        ]);
+
+        $venueAdmin = User::firstOrCreate(
+            ['email' => 'daniela@fitzy.demo'],
+            [
+                'name' => 'Daniela Santos',
+                'first_name' => 'Daniela',
+                'last_name' => 'Santos',
+                'phone' => '+1 555 0190',
+                'role' => 'venue_admin',
+                'password' => Hash::make('password'),
+                'venue_id' => $venues['Pulse Fitness Studio']->id,
+            ]
+        );
+
         $classTypesData = [
             ['name' => 'Yoga', 'description' => 'Mindful flows and breath work.'],
             ['name' => 'HIIT', 'description' => 'High intensity interval training.'],
@@ -116,6 +134,42 @@ class DemoContentSeeder extends Seeder
             return [$package->name => $package];
         });
 
+        $instructorsData = [
+            [
+                'venue' => 'Pulse Fitness Studio',
+                'name' => 'Lucía Fernández',
+                'email' => 'lucia@fitzy.demo',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=LF&backgroundColor=5865F2&fontWeight=700',
+            ],
+            [
+                'venue' => 'Pulse Fitness Studio',
+                'name' => 'Carlos Méndez',
+                'email' => 'carlos@fitzy.demo',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=CM&backgroundColor=22D3EE&fontWeight=700',
+            ],
+            [
+                'venue' => 'Zen Yoga Loft',
+                'name' => 'Sofía Rivas',
+                'email' => 'sofia@fitzy.demo',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=SR&backgroundColor=4752C4&fontWeight=700',
+            ],
+        ];
+
+        $instructors = collect($instructorsData)->mapWithKeys(function (array $data) use ($venues) {
+            $instructor = VenueInstructor::updateOrCreate(
+                [
+                    'venue_id' => $venues[$data['venue']]->id,
+                    'name' => $data['name'],
+                ],
+                [
+                    'email' => $data['email'],
+                    'avatar_url' => $data['avatar_url'],
+                ]
+            );
+
+            return [$instructor->name => $instructor];
+        });
+
         $start = Carbon::parse('2024-08-01 09:00:00', 'UTC');
 
         $sessionsData = [
@@ -126,6 +180,7 @@ class DemoContentSeeder extends Seeder
                 'start_offset' => 0,
                 'duration_minutes' => 60,
                 'coach_name' => 'Ana López',
+                'instructor' => 'Sofía Rivas',
                 'capacity_total' => 15,
                 'capacity_taken' => 8,
                 'price' => 18,
@@ -139,6 +194,7 @@ class DemoContentSeeder extends Seeder
                 'start_offset' => 4,
                 'duration_minutes' => 60,
                 'coach_name' => 'Carlos Medina',
+                'instructor' => 'Sofía Rivas',
                 'capacity_total' => 15,
                 'capacity_taken' => 12,
                 'price' => 18,
@@ -152,6 +208,7 @@ class DemoContentSeeder extends Seeder
                 'start_offset' => 3,
                 'duration_minutes' => 45,
                 'coach_name' => 'Victoria Díaz',
+                'instructor' => 'Lucía Fernández',
                 'capacity_total' => 20,
                 'capacity_taken' => 19,
                 'price' => 22,
@@ -165,6 +222,7 @@ class DemoContentSeeder extends Seeder
                 'start_offset' => 10.5,
                 'duration_minutes' => 45,
                 'coach_name' => 'Miguel Torres',
+                'instructor' => 'Carlos Méndez',
                 'capacity_total' => 20,
                 'capacity_taken' => 9,
                 'price' => 22,
@@ -178,6 +236,7 @@ class DemoContentSeeder extends Seeder
                 'start_offset' => 11,
                 'duration_minutes' => 50,
                 'coach_name' => 'Valentina Rojas',
+                'instructor' => null,
                 'capacity_total' => 25,
                 'capacity_taken' => 24,
                 'price' => 25,
@@ -186,7 +245,7 @@ class DemoContentSeeder extends Seeder
             ],
         ];
 
-        $sessions = collect($sessionsData)->map(function (array $data) use ($start, $venues, $classTypes) {
+        $sessions = collect($sessionsData)->map(function (array $data) use ($start, $venues, $classTypes, $instructors) {
             $startAt = $start->copy()->addHours($data['start_offset']);
             $endAt = $startAt->copy()->addMinutes($data['duration_minutes']);
 
@@ -200,6 +259,9 @@ class DemoContentSeeder extends Seeder
                 [
                     'end_datetime' => $endAt,
                     'coach_name' => $data['coach_name'],
+                    'instructor_id' => $data['instructor']
+                        ? $instructors[$data['instructor']]->id
+                        : null,
                     'capacity_total' => $data['capacity_total'],
                     'capacity_taken' => $data['capacity_taken'],
                     'price' => $data['price'],

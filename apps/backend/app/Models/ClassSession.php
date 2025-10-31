@@ -8,6 +8,7 @@ use App\Models\Venue;
 use App\Models\ClassType;
 use App\Models\Booking;
 use App\Models\WaitlistEntry;
+use App\Models\VenueInstructor;
 
 class ClassSession extends Model
 {
@@ -16,6 +17,7 @@ class ClassSession extends Model
     protected $fillable = [
         'venue_id',
         'class_type_id',
+        'instructor_id',
         'name',
         'description',
         'coach_name',
@@ -45,6 +47,11 @@ class ClassSession extends Model
     public function classType()
     {
         return $this->belongsTo(ClassType::class);
+    }
+
+    public function instructor()
+    {
+        return $this->belongsTo(VenueInstructor::class, 'instructor_id');
     }
 
     public function bookings()

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\PackageOwnershipController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\VenueController;
+use App\Http\Controllers\Api\VenueInstructorController;
 use App\Http\Controllers\Api\WaitlistEntryController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,7 @@ Route::get('sessions', [ClassSessionController::class, 'index']);
 Route::get('sessions/{classSession}', [ClassSessionController::class, 'show']);
 Route::get('packages', [PackageController::class, 'index']);
 Route::get('packages/{package}', [PackageController::class, 'show']);
+Route::get('instructors', [VenueInstructorController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('bookings', BookingController::class)->except(['create', 'edit']);
@@ -45,6 +47,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('venues', [VenueController::class, 'store']);
         Route::put('venues/{venue}', [VenueController::class, 'update']);
         Route::delete('venues/{venue}', [VenueController::class, 'destroy']);
+
+        Route::post('instructors', [VenueInstructorController::class, 'store']);
+        Route::put('instructors/{instructor}', [VenueInstructorController::class, 'update']);
+        Route::delete('instructors/{instructor}', [VenueInstructorController::class, 'destroy']);
 
         Route::post('class-types', [ClassTypeController::class, 'store']);
         Route::put('class-types/{classType}', [ClassTypeController::class, 'update']);

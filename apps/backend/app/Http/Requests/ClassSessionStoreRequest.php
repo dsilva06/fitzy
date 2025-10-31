@@ -19,6 +19,7 @@ class ClassSessionStoreRequest extends FormRequest
         return [
             'venue_id' => ['required', 'exists:venues,id'],
             'class_type_id' => ['required', 'exists:class_types,id'],
+            'instructor_id' => ['nullable', 'exists:venue_instructors,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'coach_name' => ['nullable', 'string', 'max:255'],

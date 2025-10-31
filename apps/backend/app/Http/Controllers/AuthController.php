@@ -38,7 +38,7 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $user->load('venue'),
         ]);
     }
 
@@ -47,7 +47,7 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user());
+        return response()->json($request->user()->load('venue'));
     }
 
     /**
@@ -73,7 +73,7 @@ class AuthController extends Controller
 
         $user->save();
 
-        return response()->json($user->fresh());
+        return response()->json($user->fresh()->load('venue'));
     }
 
     /**
