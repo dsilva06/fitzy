@@ -10,7 +10,11 @@ import PersonalInfo from "./PersonalInfo";
 import Wallet from "./Wallet";
 import CategoryResults from "./CategoryResults";
 import CategorySchedule from "./CategorySchedule";
+import Login from "./Login.jsx";
+import Register from "./Register.jsx";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import AuthProvider from '@/contexts/AuthProvider';
+import RequireAuth from '@/components/RequireAuth';
 import { createPageUrl, getPageNameFromPath } from "@/utils";
 
 const PAGES = {
@@ -37,41 +41,44 @@ function PagesContent() {
     const currentPage = _getCurrentPage(location.pathname);
     
     return (
-        <Layout currentPageName={currentPage}>
-            <Routes>            
-                
-                    <Route path="/" element={<Home />} />
-                
-                
-                <Route path={createPageUrl("Explore")} element={<Explore />} />
-                
-                <Route path={createPageUrl("Calendar")} element={<Calendar />} />
-                
-                <Route path={createPageUrl("Favorites")} element={<Favorites />} />
-                
-                <Route path={createPageUrl("VenueSchedule")} element={<VenueSchedule />} />
-                
-                <Route path={createPageUrl("ReservationDetails")} element={<ReservationDetails />} />
-                
-                <Route path={createPageUrl("Packages")} element={<Packages />} />
-                
-                <Route path={createPageUrl("PersonalInfo")} element={<PersonalInfo />} />
-                
-                <Route path={createPageUrl("Wallet")} element={<Wallet />} />
-                
-                <Route path={createPageUrl("CategoryResults")} element={<CategoryResults />} />
-                
-                <Route path={createPageUrl("CategorySchedule")} element={<CategorySchedule />} />
-                
+        <>
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Register />} />
+
+                <Route path="/" element={<Layout currentPageName={currentPage}><Home /></Layout>} />
+
+                <Route path={createPageUrl("Explore")} element={<Layout currentPageName={currentPage}><Explore /></Layout>} />
+
+                <Route path={createPageUrl("Calendar")} element={<Layout currentPageName={currentPage}><Calendar /></Layout>} />
+
+                <Route path={createPageUrl("Favorites")} element={<Layout currentPageName={currentPage}><Favorites /></Layout>} />
+
+                <Route path={createPageUrl("VenueSchedule")} element={<Layout currentPageName={currentPage}><VenueSchedule /></Layout>} />
+
+                <Route path={createPageUrl("ReservationDetails")} element={<RequireAuth><Layout currentPageName={currentPage}><ReservationDetails /></Layout></RequireAuth>} />
+
+                <Route path={createPageUrl("Packages")} element={<Layout currentPageName={currentPage}><Packages /></Layout>} />
+
+                <Route path={createPageUrl("PersonalInfo")} element={<RequireAuth><Layout currentPageName={currentPage}><PersonalInfo /></Layout></RequireAuth>} />
+
+                <Route path={createPageUrl("Wallet")} element={<RequireAuth><Layout currentPageName={currentPage}><Wallet /></Layout></RequireAuth>} />
+
+                <Route path={createPageUrl("CategoryResults")} element={<Layout currentPageName={currentPage}><CategoryResults /></Layout>} />
+
+                <Route path={createPageUrl("CategorySchedule")} element={<Layout currentPageName={currentPage}><CategorySchedule /></Layout>} />
+
             </Routes>
-        </Layout>
+        </>
     );
 }
 
 export default function Pages() {
     return (
         <Router>
-            <PagesContent />
+            <AuthProvider>
+                <PagesContent />
+            </AuthProvider>
         </Router>
     );
 }

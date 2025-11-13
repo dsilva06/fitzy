@@ -98,7 +98,7 @@ export default function PersonalInfoPage() {
         {/* Profile Picture */}
         <div className="flex flex-col items-center">
           <div className="relative w-32 h-32 mb-4">
-            <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden shadow-lg">
+            <div className="w-full h-full rounded-full bg-gradient-to-br from-brand-400 to-brand-700 overflow-hidden shadow-lg">
               {profilePicPreview ? (
                 <img src={profilePicPreview} alt="Profile Preview" className="w-full h-full object-cover" />
               ) : (
@@ -107,7 +107,7 @@ export default function PersonalInfoPage() {
                 </div>
               )}
             </div>
-            <label htmlFor="profile-pic-upload" className="absolute bottom-0 right-0 w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-blue-700 transition-colors border-4 border-white">
+            <label htmlFor="profile-pic-upload" className="absolute bottom-0 right-0 w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-brand-700 transition-colors border-4 border-white">
               <Camera className="w-5 h-5" />
             </label>
             <input
@@ -129,7 +129,7 @@ export default function PersonalInfoPage() {
               value={formData.first_name}
               onChange={handleChange}
               placeholder="First Name"
-              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-brand-500 focus:outline-none"
             />
           </div>
           <div className="relative">
@@ -139,7 +139,7 @@ export default function PersonalInfoPage() {
               value={formData.last_name}
               onChange={handleChange}
               placeholder="Last Name"
-              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-brand-500 focus:outline-none"
             />
           </div>
           <div className="relative">
@@ -150,7 +150,7 @@ export default function PersonalInfoPage() {
               value={formData.phone}
               onChange={handleChange}
               placeholder="Phone Number"
-              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none"
+              className="w-full pl-12 pr-4 py-4 bg-white rounded-2xl border-2 border-gray-200 focus:border-brand-500 focus:outline-none"
             />
           </div>
           <div className="relative">
@@ -168,7 +168,7 @@ export default function PersonalInfoPage() {
         <button
           type="submit"
           disabled={updateUserMutation.isLoading}
-          className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-2xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-bold text-lg rounded-2xl hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
         >
           {updateUserMutation.isLoading ? (
             <>

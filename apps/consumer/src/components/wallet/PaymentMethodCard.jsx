@@ -15,8 +15,8 @@ const BANK_THEMES = {
   "default": { bg: "from-gray-700 to-gray-900", iconColor: "text-gray-300" },
   "Banco de Venezuela": { bg: "from-red-600 to-red-800", iconColor: "text-red-100" },
   "Banesco": { bg: "from-green-500 to-green-700", iconColor: "text-green-100" },
-  "Mercantil": { bg: "from-blue-600 to-blue-800", iconColor: "text-blue-100" },
-  "Provincial": { bg: "from-blue-700 to-blue-900", iconColor: "text-blue-100" },
+  "Mercantil": { bg: "from-brand-600 to-brand-800", iconColor: "text-brand-100" },
+  "Provincial": { bg: "from-brand-700 to-brand-900", iconColor: "text-brand-100" },
 };
 
 // --- HELPER COMPONENTS ---

@@ -1,16 +1,15 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, getLocalToday } from "@/utils";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, MapPin, Clock, Heart, Package, Compass } from "lucide-react";
 import { format, isAfter, isBefore, addHours } from "date-fns";
 
-const DEMO_TODAY = new Date('2024-08-01T12:00:00Z');
-
 export default function HomePage() {
   const navigate = useNavigate();
+  const today = getLocalToday();
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -33,7 +32,7 @@ export default function HomePage() {
             const session = sessions.find(s => s.id === booking.session_id);
             return { ...booking, session };
         })
-        .filter(b => b.session && isAfter(new Date(b.session.start_datetime), DEMO_TODAY))
+        .filter(b => b.session && isAfter(new Date(b.session.start_datetime), today))
         .sort((a,b) => new Date(a.session.start_datetime) - new Date(b.session.start_datetime));
     },
     enabled: !!user,
@@ -77,10 +76,10 @@ export default function HomePage() {
 
       {/* Next Class Card or Empty State */}
       {nextSession && nextVenue ? (
-        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-6 mb-10 text-white shadow-xl">
+        <div className="bg-gradient-to-br from-brand-600 to-brand-800 rounded-3xl p-6 mb-10 text-white shadow-xl">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="text-blue-100 text-sm font-medium mb-1">Next Class</p>
+              <p className="text-brand-100 text-sm font-medium mb-1">Next Class</p>
               <h2 className="text-2xl font-bold mb-2">{nextSession.name}</h2>
             </div>
             <div className="bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full">
@@ -104,7 +103,7 @@ export default function HomePage() {
           <div className="flex gap-3">
             <button 
               onClick={() => navigate(createPageUrl("ReservationDetails") + `?bookingId=${nextBooking.id}`)}
-              className="flex-1 bg-white text-blue-600 font-bold py-3.5 rounded-2xl hover:bg-blue-50 transition-colors"
+              className="flex-1 bg-white text-brand-600 font-bold py-3.5 rounded-2xl hover:bg-brand-50 transition-colors"
             >
               Open details
             </button>
@@ -131,8 +130,8 @@ export default function HomePage() {
             onClick={() => navigate(createPageUrl("Explore"))}
             className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg border border-gray-100 hover:border-transparent transition-all text-left"
           >
-            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-4">
-              <Compass className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-brand-100 rounded-2xl flex items-center justify-center mb-4">
+              <Compass className="w-6 h-6 text-brand-600" />
             </div>
             <h4 className="font-bold text-gray-900 mb-1">Explore Today</h4>
             <p className="text-sm text-gray-600">Find classes near you</p>

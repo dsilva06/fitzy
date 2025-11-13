@@ -30,13 +30,13 @@ export default function PaymentMethodPicker({
             onClick={() => onSelectMethod({ type: "credits" })}
             className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
               selectedMethod?.type === "credits"
-                ? "border-blue-600 bg-blue-50"
+                ? "border-brand-600 bg-brand-50"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-brand-500 rounded-xl flex items-center justify-center">
                   <Wallet className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -47,7 +47,7 @@ export default function PaymentMethodPicker({
                 </div>
               </div>
               {selectedMethod?.type === "credits" && (
-                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                   </svg>
@@ -63,7 +63,7 @@ export default function PaymentMethodPicker({
             onClick={() => onSelectMethod(defaultCard)}
             className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
               selectedMethod?.id === defaultCard.id
-                ? "border-blue-600 bg-blue-50"
+                ? "border-brand-600 bg-brand-50"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
@@ -75,7 +75,7 @@ export default function PaymentMethodPicker({
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-gray-900">{defaultCard.masked_details}</p>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    <span className="px-2 py-0.5 bg-brand-100 text-brand-700 text-xs font-medium rounded">
                       Default
                     </span>
                   </div>
@@ -83,7 +83,7 @@ export default function PaymentMethodPicker({
                 </div>
               </div>
               {selectedMethod?.id === defaultCard.id && (
-                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                   </svg>
@@ -100,7 +100,7 @@ export default function PaymentMethodPicker({
             onClick={() => onSelectMethod(card)}
             className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
               selectedMethod?.id === card.id
-                ? "border-blue-600 bg-blue-50"
+                ? "border-brand-600 bg-brand-50"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
@@ -115,7 +115,7 @@ export default function PaymentMethodPicker({
                 </div>
               </div>
               {selectedMethod?.id === card.id && (
-                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                   </svg>
@@ -128,7 +128,7 @@ export default function PaymentMethodPicker({
         {!hasEnoughCredits && paymentMethods.length === 0 && (
           <div className="text-center py-6 text-gray-500">
             <p className="mb-3">No payment methods available</p>
-            <button className="text-blue-600 font-semibold hover:text-blue-700">
+            <button className="text-brand-600 font-semibold hover:text-brand-700">
               Add payment method →
             </button>
           </div>

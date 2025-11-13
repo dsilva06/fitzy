@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\VenueStoreRequest;
 use App\Http\Requests\VenueUpdateRequest;
+use App\Enums\VenueStatus;
 
 class VenueController extends Controller
 {
@@ -17,8 +18,21 @@ class VenueController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Venue::query();
+        $user = $request->user();
 
-        $this->applyFilters($query, $request, ['id', 'city', 'neighborhood']);
+        if (! $user || $user->role !== 'owner') {
+            $query->where('status', VenueStatus::Approved->value);
+        }
+
+        if ($request->boolean('with_admins')) {
+            if (! $user || $user->role !== 'owner') {
+                abort(403, 'Forbidden.');
+            }
+
+            $query->with(['venueAdmins' => fn ($adminQuery) => $adminQuery->orderBy('created_at')]);
+        }
+
+        $this->applyFilters($query, $request, ['id', 'city', 'neighborhood', 'status']);
         $this->applySorting($query, $request, ['name', 'rating', 'created_at'], 'name');
         $this->applyLimit($query, $request);
 
@@ -34,8 +48,18 @@ class VenueController extends Controller
         return response()->json($venue, 201);
     }
 
-    public function show(Venue $venue): JsonResponse
+    public function show(Request $request, Venue $venue): JsonResponse
     {
+        $user = $request->user();
+
+        if ((! $user || $user->role !== 'owner') && $venue->status !== VenueStatus::Approved->value) {
+            abort(404);
+        }
+
+        if ($request->boolean('with_admins') && $user && $user->role === 'owner') {
+            $venue->loadMissing(['venueAdmins' => fn ($adminQuery) => $adminQuery->orderBy('created_at')]);
+        }
+
         return response()->json($venue);
     }
 
@@ -53,5 +77,37 @@ class VenueController extends Controller
         $venue->delete();
 
         return response()->json(status: 204);
+    }
+
+    public function approve(Request $request, Venue $venue): JsonResponse
+    {
+        $data = $request->validate([
+            'note' => ['nullable', 'string'],
+        ]);
+
+        $venue->forceFill([
+            'status' => VenueStatus::Approved->value,
+            'status_note' => $data['note'] ?? null,
+            'approved_at' => now(),
+            'approved_by' => $request->user()->id,
+        ])->save();
+
+        return response()->json($venue->fresh()->load('venueAdmins'));
+    }
+
+    public function reject(Request $request, Venue $venue): JsonResponse
+    {
+        $data = $request->validate([
+            'note' => ['nullable', 'string'],
+        ]);
+
+        $venue->forceFill([
+            'status' => VenueStatus::Rejected->value,
+            'status_note' => $data['note'] ?? null,
+            'approved_at' => null,
+            'approved_by' => $request->user()->id,
+        ])->save();
+
+        return response()->json($venue->fresh()->load('venueAdmins'));
     }
 }

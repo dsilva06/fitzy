@@ -14,8 +14,8 @@ const CategoryTile = ({ category, onSelect }) => (
     whileTap={{ scale: 0.98 }}
   >
     <div className="flex items-center gap-5">
-      <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
-        <category.icon className="w-7 h-7 text-blue-600" />
+      <div className="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center">
+        <category.icon className="w-7 h-7 text-brand-600" />
       </div>
       <span className="font-bold text-lg text-gray-900">{category.name}</span>
     </div>
@@ -77,7 +77,7 @@ export default function ExplorePage() {
             placeholder="Search venue or neighborhood..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-5 py-4 bg-white rounded-2xl border-2 border-gray-200/80 focus:border-blue-500 focus:outline-none transition-colors text-base"
+            className="w-full pl-14 pr-5 py-4 bg-white rounded-2xl border-2 border-gray-200/80 focus:border-brand-500 focus:outline-none transition-colors text-base"
           />
         </div>
       </div>
@@ -89,13 +89,13 @@ export default function ExplorePage() {
             key={tab.id}
             onClick={() => handleTabClick(tab.id)}
             className={`relative py-3.5 px-4 text-base font-semibold transition-colors ${
-              activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab.id ? 'text-brand-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {tab.label}
             {activeTab === tab.id && (
               <motion.div
-                className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-brand-600 rounded-full"
                 layoutId="exploreUnderline"
               />
             )}

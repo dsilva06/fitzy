@@ -1,16 +1,32 @@
-# React + Vite
+# Fitzy Owner Admin
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This single-page app lets the operations team review and approve venue onboarding requests that come from the venue-admin portal. It consumes the same Fitzy API, but limits access to owner-level accounts.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+# from the repo root
+npm install
+npm run dev --workspace owner-admin
+```
 
-## React Compiler
+### Environment variables
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create an `.env` file next to `vite.config.js` with:
 
-## Expanding the ESLint configuration
+```
+VITE_API_BASE_URL=http://localhost:8000/api
+VITE_OWNER_EMAIL=test@example.com
+VITE_OWNER_PASSWORD=password
+VITE_OWNER_AUTO_LOGIN=true
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The email/password should match an owner user that exists in your backend seeders.
+
+## Features
+
+- Owner authentication (restores previous session when possible)
+- Consolidated metrics for pending/approved/rejected venues
+- Filterable list of venues grouped by status
+- Detail view showing venue metadata, linked admin accounts, and historical notes
+- Inline approvals/rejections with optional status notes and auto-refresh of the list

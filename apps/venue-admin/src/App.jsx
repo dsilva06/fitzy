@@ -747,6 +747,42 @@ function buildTimeSeries({ buckets, classes, packageOwnerships, bookings, paymen
   });
 }
 
+function niceNumber(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue === 0) return 0;
+  const exponent = Math.floor(Math.log10(Math.abs(numericValue)));
+  const fraction = Math.abs(numericValue) / Math.pow(10, exponent);
+  let niceFraction;
+  if (fraction <= 1) {
+    niceFraction = 1;
+  } else if (fraction <= 2) {
+    niceFraction = 2;
+  } else if (fraction <= 5) {
+    niceFraction = 5;
+  } else {
+    niceFraction = 10;
+  }
+  return niceFraction * Math.pow(10, exponent);
+}
+
+function buildAxisTicks(maxValue, { minTicks = 4 } = {}) {
+  const numericMax = Number(maxValue);
+  if (!Number.isFinite(numericMax) || numericMax <= 0) {
+    return [0];
+  }
+  const niceMax = Math.max(1, niceNumber(numericMax));
+  const rawStep = niceMax / Math.max(1, minTicks);
+  const niceStep = Math.max(1, niceNumber(rawStep));
+  const ticks = [];
+  for (let tick = 0; tick <= niceMax + niceStep * 0.25; tick += niceStep) {
+    ticks.push(Math.round(tick));
+  }
+  if (!ticks.includes(Math.round(niceMax))) {
+    ticks.push(Math.round(niceMax));
+  }
+  return [...new Set(ticks)].sort((a, b) => a - b);
+}
+
 function Icon({ name, size = 20 }) {
   const icons = {
     bolt: (
@@ -929,6 +965,709 @@ function Switch({ checked, onChange, ariaLabel }) {
   );
 }
 
+const SAVED_ACCOUNTS_STORAGE_KEY = 'fitzy:auth:saved-accounts';
+
+function loadSavedAccounts() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(SAVED_ACCOUNTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item) => item && typeof item.email === 'string' && item.email.length > 0
+    );
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedAccounts(list) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      SAVED_ACCOUNTS_STORAGE_KEY,
+      JSON.stringify(list.slice(0, 10))
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function AuthScreen({ onSuccess, message, onPending }) {
+  const [mode, setMode] = useState('login');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [venues, setVenues] = useState([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
+  const defaultEmail =
+    import.meta.env?.VITE_VENUE_ADMIN_EMAIL ?? 'daniela@fitzy.demo';
+  const deviceName =
+    import.meta.env?.VITE_VENUE_ADMIN_DEVICE_NAME ?? 'venue-admin-web';
+
+  const [form, setForm] = useState({
+    email: defaultEmail,
+    password: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    venueId: '',
+    isNewVenue: false,
+    venueName: '',
+    venueCity: '',
+    venueNeighborhood: '',
+    venueAddress: '',
+    venueDescription: '',
+  });
+  const [savedAccounts, setSavedAccounts] = useState(() => loadSavedAccounts());
+  const [pendingNotice, setPendingNotice] = useState(null);
+
+  useEffect(() => {
+    if (mode !== 'register' || venues.length > 0) return;
+
+    let active = true;
+    setLoadingVenues(true);
+    fitzy.entities.Venue.list()
+      .then((data) => {
+        if (!active) return;
+        if (Array.isArray(data)) {
+          setVenues(
+            [...data].sort((a, b) => a.name.localeCompare(b.name))
+          );
+        } else {
+          setVenues([]);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          console.warn('No se pudieron cargar los venues disponibles.', err);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoadingVenues(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [mode, venues.length]);
+
+  const handleFieldChange = (field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    if (field !== 'password') {
+      setPendingNotice(null);
+    }
+  };
+
+  const handleVenueModeChange = (isNew) => {
+    setForm((prev) => ({
+      ...prev,
+      isNewVenue: isNew,
+      venueId: isNew ? '' : prev.venueId,
+    }));
+    setPendingNotice(null);
+  };
+
+  const extractErrorMessage = (err, fallback) => {
+    const response = err?.response?.data;
+    if (response?.errors) {
+      const first = Object.values(response.errors)
+        .flat()
+        .find((item) => typeof item === 'string' && item.length > 0);
+      if (first) return first;
+    }
+    if (typeof response?.message === 'string') {
+      return response.message;
+    }
+    if (typeof err?.message === 'string') {
+      return err.message;
+    }
+    return fallback;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    const email = form.email.trim().toLowerCase();
+    const password = form.password;
+
+    if (!email || !password) {
+      setError('Introduce tu correo electrónico y contraseña.');
+      return;
+    }
+
+    if (mode === 'register') {
+      if (!form.firstName.trim() || !form.lastName.trim()) {
+        setError('Ingresa nombre y apellido.');
+        return;
+      }
+      if (password.length < 8) {
+        setError('La contraseña debe tener al menos 8 caracteres.');
+        return;
+      }
+      if (form.isNewVenue) {
+        if (!form.venueName.trim()) {
+          setError('Describe el nombre comercial de tu venue.');
+          return;
+        }
+      } else if (!form.venueId) {
+        setError('Selecciona el venue al que pertenecerás.');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      let user;
+      if (mode === 'login') {
+        const loginUser = await fitzy.auth.login({
+          email,
+          password,
+          deviceName,
+        });
+        const existing = savedAccounts.find(
+          (account) => account.email.toLowerCase() === email
+        );
+        if (!existing) {
+          const nextSaved = [
+            {
+              email,
+              firstName: loginUser?.first_name ?? '',
+              lastName: loginUser?.last_name ?? '',
+              venueName: loginUser?.venue?.name ?? '',
+            },
+            ...savedAccounts,
+          ].slice(0, 10);
+          setSavedAccounts(nextSaved);
+          persistSavedAccounts(nextSaved);
+        }
+        setPendingNotice(null);
+        user = loginUser;
+      } else {
+        const registration = await fitzy.auth.register({
+          email,
+          password,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim() || null,
+          role: 'venue_admin',
+          venueId: form.isNewVenue && !form.venueId ? null : form.venueId ? Number(form.venueId) : null,
+          venueName: form.isNewVenue ? form.venueName.trim() : null,
+          venueCity: form.isNewVenue ? form.venueCity.trim() || null : null,
+          venueNeighborhood: form.isNewVenue ? form.venueNeighborhood.trim() || null : null,
+          venueAddress: form.isNewVenue ? form.venueAddress.trim() || null : null,
+          venueDescription: form.isNewVenue ? form.venueDescription.trim() || null : null,
+          deviceName,
+        });
+
+        if (!registration || registration.pending || !registration.user) {
+          const pendingMessage =
+            registration?.message ??
+            'Recibimos tu solicitud. Te avisaremos cuando aprobemos tu acceso.';
+          setPendingNotice({
+            message: pendingMessage,
+            email,
+            venueName: form.isNewVenue
+              ? form.venueName.trim()
+              : venues.find((venue) => Number(venue.id) === Number(form.venueId))?.name ?? '',
+          });
+          if (typeof onPending === 'function') {
+            onPending(pendingMessage);
+          }
+          setMode('login');
+          setForm((prev) => ({
+            ...prev,
+            password: '',
+          }));
+          return;
+        }
+
+        user = registration.user;
+        const venueName =
+          form.isNewVenue
+            ? form.venueName.trim()
+            : venues.find((venue) => Number(venue.id) === Number(form.venueId))
+                ?.name ?? '';
+        const newSaved = [
+          { email, firstName: form.firstName.trim(), lastName: form.lastName.trim(), venueName },
+          ...savedAccounts.filter(
+            (account) => account.email.toLowerCase() !== email
+          ),
+        ].slice(0, 10);
+        setSavedAccounts(newSaved);
+        persistSavedAccounts(newSaved);
+        setPendingNotice(null);
+      }
+
+      onSuccess(user, mode);
+    } catch (err) {
+      const fallback =
+        mode === 'login'
+          ? 'No se pudo iniciar sesión. Verifica tus credenciales.'
+          : 'No se pudo crear la cuenta. Inténtalo nuevamente.';
+      const extracted = extractErrorMessage(err, fallback);
+      if (
+        mode === 'login' &&
+        ['pending', 'rejected'].includes(err?.response?.data?.status ?? '')
+      ) {
+        setPendingNotice({
+          message: extracted,
+          email: err?.response?.data?.user?.email ?? email,
+          venueName: err?.response?.data?.user?.venue?.name ?? '',
+        });
+        if (typeof onPending === 'function') {
+          onPending(extracted);
+        }
+      }
+      setError(extracted);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setMode((prev) => (prev === 'login' ? 'register' : 'login'));
+    setError('');
+    setPendingNotice(null);
+  };
+
+  const handleApplySavedAccount = (account) => {
+    setMode('login');
+    setForm((prev) => ({
+      ...prev,
+      email: account.email,
+      password: '',
+      isNewVenue: false,
+    }));
+    setError('');
+  };
+
+  const handleRemoveSavedAccount = (email) => {
+    const filtered = savedAccounts.filter(
+      (account) => account.email.toLowerCase() !== email.toLowerCase()
+    );
+    setSavedAccounts(filtered);
+    persistSavedAccounts(filtered);
+  };
+
+  return (
+    <div className="auth-shell">
+      <div className="auth-container">
+        <aside className="auth-hero">
+          <div className="auth-hero-content">
+            <span className="auth-badge">Administra como los grandes</span>
+            <h2 className="auth-hero-title">
+              Gestiona tu estudio con la misma experiencia que las apps líderes.
+            </h2>
+            <p className="auth-hero-subtitle">
+              Dashboard en tiempo real, herramientas de ocupación y un flujo de reservas
+              pensado para crecer tu comunidad.
+            </p>
+            <ul className="auth-hero-list">
+              <li>
+                <span className="auth-hero-icon">✓</span>
+                Control total de clases, instructores y salas
+              </li>
+              <li>
+                <span className="auth-hero-icon">✓</span>
+                Insights listos para compartir con tu equipo
+              </li>
+              <li>
+                <span className="auth-hero-icon">✓</span>
+                Integración instantánea con la app de clientes
+              </li>
+            </ul>
+            <div className="auth-hero-highlights">
+              <div className="auth-highlight">
+                <span className="auth-highlight-label">Locales activos</span>
+                <span className="auth-highlight-value">120+</span>
+              </div>
+              <div className="auth-highlight">
+                <span className="auth-highlight-label">Reservas mensuales</span>
+                <span className="auth-highlight-value">48K</span>
+              </div>
+              <div className="auth-highlight">
+                <span className="auth-highlight-label">Satisfacción</span>
+                <span className="auth-highlight-value">4.9★</span>
+              </div>
+            </div>
+          </div>
+          <div className="auth-hero-art" aria-hidden="true">
+            <div className="auth-hero-glow" />
+            <div className="auth-hero-card auth-hero-card--primary">
+              <div className="auth-hero-chip">Hoy</div>
+              <h3>26 clases activas</h3>
+              <p>85% de ocupación media</p>
+            </div>
+            <div className="auth-hero-card auth-hero-card--secondary">
+              <div className="auth-hero-avatar-group">
+                <span className="auth-hero-avatar">DS</span>
+                <span className="auth-hero-avatar">LM</span>
+                <span className="auth-hero-avatar">SR</span>
+              </div>
+              <p>Equipo operativo al instante</p>
+            </div>
+          </div>
+        </aside>
+
+        <div className="auth-panel">
+          <div className="auth-panel-header">
+            <div className="logo-badge">
+              <Icon name="bolt" size={20} />
+            </div>
+            <div>
+              <p className="auth-eyebrow">Fitzy Venue Admin</p>
+              <h1 className="auth-title">
+                {mode === 'login' ? 'Bienvenido de nuevo' : 'Activa tu estación de trabajo'}
+              </h1>
+            </div>
+          </div>
+
+          {message ? <p className="auth-message">{message}</p> : null}
+          {pendingNotice ? (
+            <div className="auth-pending-card" role="status">
+              <div className="auth-pending-icon" aria-hidden="true">
+                ⏳
+              </div>
+              <div className="auth-pending-content">
+                <p className="auth-pending-title">Solicitud en revisión</p>
+                <p className="auth-pending-message">{pendingNotice.message}</p>
+                <div className="auth-pending-meta">
+                  {pendingNotice.venueName ? (
+                    <span>
+                      Venue:{' '}
+                      <strong>{pendingNotice.venueName}</strong>
+                    </span>
+                  ) : null}
+                  {pendingNotice.email ? (
+                    <span>
+                      Contacto:{' '}
+                      <strong>{pendingNotice.email}</strong>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {error ? <p className="auth-error">{error}</p> : null}
+
+          <div className="auth-social">
+            <button type="button" className="auth-social-btn auth-social-btn--apple">
+              <span className="auth-social-icon"></span>
+              Continuar con Apple
+            </button>
+            <button type="button" className="auth-social-btn auth-social-btn--google">
+              <span className="auth-social-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="#EA4335"
+                    d="M12 10.2v3.6h5.1c-.2 1.1-.8 2.1-1.7 2.8l2.7 2.1c1.6-1.5 2.6-3.7 2.6-6.3 0-.6-.1-1.2-.2-1.8H12z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M6.6 14.3l-.9.7-2.1 1.6C5 19.9 8.2 22 12 22c2.4 0 4.4-.8 5.8-2.2l-2.7-2.1c-.7.5-1.7.8-3.1.8-2.4 0-4.5-1.6-5.2-3.8z"
+                  />
+                  <path
+                    fill="#4A90E2"
+                    d="M3.6 7.6C2.6 9 2 10.5 2 12s.6 3 1.6 4.4l2.6-2c-.4-.7-.6-1.6-.6-2.4s.2-1.7.6-2.4z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M12 5.6c1.3 0 2.5.4 3.5 1.3l2.6-2.6C16.4 2.9 14.3 2 12 2 8.2 2 5 4.1 3.6 7.6l2.6 2c.7-2.2 2.8-4 5.8-4z"
+                  />
+                </svg>
+              </span>
+              Continuar con Google
+            </button>
+          </div>
+
+          <div className="auth-divider">
+            <span>o usa tu correo corporativo</span>
+          </div>
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {mode === 'register' ? (
+              <div className="auth-grid">
+                <FormField label="Nombre" id="auth-first-name">
+                  <input
+                    id="auth-first-name"
+                    type="text"
+                    className="control"
+                    value={form.firstName}
+                    onChange={(event) =>
+                      handleFieldChange('firstName', event.target.value)
+                    }
+                    autoComplete="given-name"
+                    required
+                  />
+                </FormField>
+                <FormField label="Apellido" id="auth-last-name">
+                  <input
+                    id="auth-last-name"
+                    type="text"
+                    className="control"
+                    value={form.lastName}
+                    onChange={(event) =>
+                      handleFieldChange('lastName', event.target.value)
+                    }
+                    autoComplete="family-name"
+                    required
+                  />
+                </FormField>
+              </div>
+            ) : null}
+
+            <FormField label="Correo electrónico" id="auth-email">
+              <input
+                id="auth-email"
+                type="email"
+                className="control"
+                value={form.email}
+                onChange={(event) => handleFieldChange('email', event.target.value)}
+                autoComplete="email"
+                required
+              />
+            </FormField>
+
+            {mode === 'register' ? (
+              <>
+                <FormField label="Teléfono (opcional)" id="auth-phone">
+                  <input
+                    id="auth-phone"
+                    type="tel"
+                    className="control"
+                    value={form.phone}
+                    onChange={(event) =>
+                      handleFieldChange('phone', event.target.value)
+                    }
+                    autoComplete="tel"
+                  />
+                </FormField>
+                <div className="auth-venue-switch">
+                  <p className="auth-venue-switch-label">
+                    ¿Tu estudio ya existe en Fitzy?
+                  </p>
+                  <div className="auth-venue-switch-actions">
+                    <button
+                      type="button"
+                      className={`auth-venue-option ${
+                        !form.isNewVenue ? 'auth-venue-option--active' : ''
+                      }`}
+                      onClick={() => handleVenueModeChange(false)}
+                    >
+                      Ya opera en Fitzy
+                    </button>
+                    <button
+                      type="button"
+                      className={`auth-venue-option ${
+                        form.isNewVenue ? 'auth-venue-option--active' : ''
+                      }`}
+                      onClick={() => handleVenueModeChange(true)}
+                    >
+                      Necesito registrarlo
+                    </button>
+                  </div>
+                </div>
+                {form.isNewVenue ? (
+                  <>
+                    <FormField label="Nombre comercial del venue" id="auth-venue-name">
+                      <input
+                        id="auth-venue-name"
+                        type="text"
+                        className="control"
+                        value={form.venueName}
+                        onChange={(event) =>
+                          handleFieldChange('venueName', event.target.value)
+                        }
+                        placeholder="Ej. Studio 33"
+                      />
+                    </FormField>
+                    <div className="auth-grid">
+                      <FormField label="Ciudad" id="auth-venue-city">
+                        <input
+                          id="auth-venue-city"
+                          type="text"
+                          className="control"
+                          value={form.venueCity}
+                          onChange={(event) =>
+                            handleFieldChange('venueCity', event.target.value)
+                          }
+                          placeholder="Caracas"
+                        />
+                      </FormField>
+                      <FormField label="Zona o barrio" id="auth-venue-neighborhood">
+                        <input
+                          id="auth-venue-neighborhood"
+                          type="text"
+                          className="control"
+                          value={form.venueNeighborhood}
+                          onChange={(event) =>
+                            handleFieldChange('venueNeighborhood', event.target.value)
+                          }
+                          placeholder="Las Mercedes"
+                        />
+                      </FormField>
+                    </div>
+                    <FormField label="Dirección (opcional)" id="auth-venue-address">
+                      <input
+                        id="auth-venue-address"
+                        type="text"
+                        className="control"
+                        value={form.venueAddress}
+                        onChange={(event) =>
+                          handleFieldChange('venueAddress', event.target.value)
+                        }
+                        placeholder="Av. Principal, piso 2"
+                      />
+                    </FormField>
+                    <FormField
+                      label="Cuéntanos en qué consiste (opcional)"
+                      id="auth-venue-description"
+                      hint="Usamos esta descripción para validar tu solicitud."
+                    >
+                      <textarea
+                        id="auth-venue-description"
+                        className="control control--textarea"
+                        rows={3}
+                        value={form.venueDescription}
+                        onChange={(event) =>
+                          handleFieldChange('venueDescription', event.target.value)
+                        }
+                        placeholder="Entrenamientos funcionales, yoga y programas personalizados."
+                      />
+                    </FormField>
+                  </>
+                ) : (
+                  <FormField label="Selecciona tu venue" id="auth-venue">
+                    <select
+                      id="auth-venue"
+                      className="control"
+                      value={form.venueId}
+                      onChange={(event) =>
+                        handleFieldChange('venueId', event.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Selecciona un venue</option>
+                      {loadingVenues ? (
+                        <option value="" disabled>
+                          Cargando venues...
+                        </option>
+                      ) : null}
+                      {venues.map((venue) => (
+                        <option key={venue.id} value={venue.id}>
+                          {venue.name}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                )}
+              </>
+            ) : null}
+
+            <FormField
+              label="Contraseña"
+              id="auth-password"
+              hint={mode === 'register' ? 'Mínimo 8 caracteres.' : undefined}
+            >
+              <input
+                id="auth-password"
+                type="password"
+                className="control"
+                value={form.password}
+                onChange={(event) =>
+                  handleFieldChange('password', event.target.value)
+                }
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                required
+              />
+            </FormField>
+
+            <button
+              type="submit"
+              className="btn btn--primary auth-submit"
+              disabled={submitting}
+            >
+              {submitting
+                ? 'Procesando...'
+                : mode === 'login'
+                  ? 'Ingresar'
+                  : form.isNewVenue
+                    ? 'Enviar solicitud'
+                    : 'Crear cuenta'}
+            </button>
+          </form>
+
+          <div className="auth-toggle">
+            <span>
+              {mode === 'login'
+                ? '¿No tienes cuenta todavía?'
+                : '¿Ya cuentas con un acceso?'}
+            </span>
+            <button
+              type="button"
+              className="auth-link"
+              onClick={toggleMode}
+              disabled={submitting}
+            >
+              {mode === 'login' ? 'Crear una cuenta' : 'Inicia sesión'}
+            </button>
+          </div>
+
+          {savedAccounts.length > 0 ? (
+            <div className="auth-saved">
+              <p className="auth-saved-title">Cuentas de prueba guardadas</p>
+              <ul className="auth-saved-list">
+                {savedAccounts.map((account) => (
+                  <li key={account.email} className="auth-saved-item">
+                    <div className="auth-saved-info">
+                      <span className="auth-saved-name">
+                        {account.firstName || account.lastName
+                          ? `${account.firstName} ${account.lastName}`.trim()
+                          : account.email}
+                      </span>
+                      <span className="auth-saved-email">{account.email}</span>
+                      {account.venueName ? (
+                        <span className="auth-saved-venue">{account.venueName}</span>
+                      ) : null}
+                    </div>
+                    <div className="auth-saved-actions">
+                      <button
+                        type="button"
+                        className="auth-link auth-link--sm"
+                        onClick={() => handleApplySavedAccount(account)}
+                        disabled={submitting}
+                      >
+                        Usar
+                      </button>
+                      <button
+                        type="button"
+                        className="auth-link auth-link--danger auth-link--sm"
+                        onClick={() => handleRemoveSavedAccount(account.email)}
+                        disabled={submitting}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Calendar({
   month,
   selectedDate,
@@ -1101,6 +1840,8 @@ function initialInstructorForm() {
 
 function App() {
   const [user, setUser] = useState(null);
+  const [authStatus, setAuthStatus] = useState('loading');
+  const [authMessage, setAuthMessage] = useState('');
   const [uiState, setUiState] = useState({
     activePage: 'home',
     selectedDate: new Date(),
@@ -1140,6 +1881,42 @@ function App() {
     showCancellations: false,
   });
 
+  const clearData = useCallback(() => {
+    setInstructors([]);
+    setClasses([]);
+    setClassTypes([]);
+    setBookings([]);
+    setPayments([]);
+    setPackageOwnerships([]);
+    setRooms([]);
+    setLoadingInstructors(false);
+    setLoadingClasses(false);
+    setLoadingClassTypes(false);
+    setLoadingBookings(false);
+    setLoadingPayments(false);
+    setLoadingOwnerships(false);
+    setLoadingRooms(false);
+  }, []);
+
+  const handleAuthSuccess = useCallback((apiUser, source = 'login') => {
+    clearData();
+    setUser(normalizeUser(apiUser));
+    setAuthStatus('authenticated');
+    setAuthMessage('');
+    setUiState({
+      activePage: 'home',
+      selectedDate: new Date(),
+      calendarMonth: startOfMonth(new Date()),
+      isAddingInstructor: false,
+      toast:
+        source === 'register'
+          ? 'Cuenta creada y sesión iniciada.'
+          : 'Sesión iniciada correctamente.',
+    });
+    setCreateClassForm(initialClassForm(new Date()));
+    setNewInstructorForm(initialInstructorForm());
+  }, [clearData]);
+
   const updateUi = (patch) => {
     setUiState((prev) => ({
       ...prev,
@@ -1148,48 +1925,76 @@ function App() {
   };
 
   useEffect(() => {
+    let active = true;
+
     async function hydrateUser() {
+      setAuthStatus('loading');
       try {
         const data = await fitzy.auth.me();
+        if (!active) return;
         if (data) {
           setUser(normalizeUser(data));
+          setAuthStatus('authenticated');
+          setAuthMessage('');
           return;
         }
       } catch (error) {
-        console.warn('No se pudo cargar el usuario. Se usa modo demo.', error);
+        if (active) {
+          console.warn('No se pudo restaurar la sesión.', error);
+        }
       }
-      setUser(FALLBACK_USER);
+
+      if (!active) return;
+      clearData();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      setAuthMessage('Inicia sesión con tus credenciales para gestionar tu venue.');
     }
 
     hydrateUser();
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [clearData]);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setClassTypes([]);
+        setLoadingClassTypes(false);
+      }
+      return;
+    }
+
+    let active = true;
     async function hydrateClassTypes() {
       setLoadingClassTypes(true);
       try {
         const data = await fitzy.entities.ClassType.list();
+        if (!active) return;
         if (Array.isArray(data)) {
           setClassTypes(
             data.map(normalizeClassType).filter((item) => item && item.id)
           );
-          return;
         }
       } catch (error) {
-        console.warn('No se pudieron cargar los tipos de clase, usando datos demo.', error);
-        if (!classTypes.length) {
-          setClassTypes(
-            FALLBACK_CLASS_TYPES.map(normalizeClassType).filter(Boolean)
-          );
+        if (active) {
+          console.warn('No se pudieron cargar los tipos de clase.', error);
         }
       } finally {
-        setLoadingClassTypes(false);
+        if (active) {
+          setLoadingClassTypes(false);
+        }
       }
     }
 
     hydrateClassTypes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [authStatus]);
 
   useEffect(() => {
     if (classTypes.length >= 1 && !createClassForm.typeId) {
@@ -1201,20 +2006,29 @@ function App() {
   }, [classTypes, createClassForm.typeId]);
 
   useEffect(() => {
-    const venueId = user?.venue?.id ?? user?.venueId;
-    if (!venueId) {
-      setInstructors(
-        FALLBACK_INSTRUCTORS.map(normalizeInstructor).filter(Boolean)
-      );
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setInstructors([]);
+        setLoadingInstructors(false);
+      }
       return;
     }
 
+    const venueId = user?.venue?.id ?? user?.venueId;
+    if (!venueId) {
+      setInstructors([]);
+      setLoadingInstructors(false);
+      return;
+    }
+
+    let active = true;
     async function hydrateInstructors() {
       setLoadingInstructors(true);
       try {
         const data = await fitzy.entities.VenueInstructor.filter({
           venue_id: venueId,
         });
+        if (!active) return;
         if (Array.isArray(data)) {
           setInstructors(
             data
@@ -1222,31 +2036,37 @@ function App() {
               .filter((item) => item && item.id)
               .sort((a, b) => a.name.localeCompare(b.name))
           );
-          return;
         }
       } catch (error) {
-        console.warn(
-          'No se pudieron cargar instructores, usando datos demo.',
-          error
-        );
-        setInstructors(
-          FALLBACK_INSTRUCTORS
-            .map(normalizeInstructor)
-            .filter(Boolean)
-            .sort((a, b) => a.name.localeCompare(b.name))
-        );
+        if (active) {
+          console.warn('No se pudieron cargar instructores.', error);
+          setInstructors([]);
+        }
       } finally {
-        setLoadingInstructors(false);
+        if (active) {
+          setLoadingInstructors(false);
+        }
       }
     }
 
     hydrateInstructors();
-  }, [user?.venueId, user?.venue]);
+    return () => {
+      active = false;
+    };
+  }, [authStatus, user?.venueId, user?.venue]);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setRooms([]);
+        setLoadingRooms(false);
+      }
+      return;
+    }
+
     const venueId = user?.venue?.id ?? user?.venueId;
     if (!venueId) {
-      setRooms(FALLBACK_ROOMS.map(normalizeRoom).filter(Boolean));
+      setRooms([]);
       setLoadingRooms(false);
       return;
     }
@@ -1266,15 +2086,13 @@ function App() {
               .filter(Boolean)
               .sort((a, b) => a.name.localeCompare(b.name))
           );
-          return;
+        } else {
+          setRooms([]);
         }
-        setRooms(
-          FALLBACK_ROOMS.map(normalizeRoom).filter(Boolean)
-        );
       } catch (error) {
-        console.warn('No se pudieron cargar salas, usando datos demo.', error);
         if (active) {
-          setRooms(FALLBACK_ROOMS.map(normalizeRoom).filter(Boolean));
+          console.warn('No se pudieron cargar salas.', error);
+          setRooms([]);
         }
       } finally {
         if (active) {
@@ -1287,22 +2105,19 @@ function App() {
     return () => {
       active = false;
     };
-  }, [user?.venueId, user?.venue]);
+  }, [authStatus, user?.venueId, user?.venue]);
 
   const refreshClasses = useCallback(async () => {
+    if (authStatus !== 'authenticated') {
+      setClasses([]);
+      setLoadingClasses(false);
+      return;
+    }
+
     const venueId = user?.venue?.id ?? user?.venueId;
     if (!venueId) {
       setLoadingClasses(false);
-      setClasses(
-        FALLBACK_CLASSES
-          .map(normalizeSession)
-          .filter(Boolean)
-          .sort((a, b) => {
-            const aStart = (a.start ?? a.start_datetime) ?? '';
-            const bStart = (b.start ?? b.start_datetime) ?? '';
-            return aStart.localeCompare(bStart);
-          })
-      );
+      setClasses([]);
       return;
     }
 
@@ -1330,38 +2145,28 @@ function App() {
         return;
       }
 
-      setClasses(
-        FALLBACK_CLASSES
-          .map(normalizeSession)
-          .filter(Boolean)
-          .sort((a, b) => {
-            const aStart = (a.start ?? a.start_datetime) ?? '';
-            const bStart = (b.start ?? b.start_datetime) ?? '';
-            return aStart.localeCompare(bStart);
-          })
-      );
+      setClasses([]);
     } catch (error) {
-      console.warn('No se pudieron cargar clases, usando datos demo.', error);
-      setClasses(
-        FALLBACK_CLASSES
-          .map(normalizeSession)
-          .filter(Boolean)
-          .sort((a, b) => {
-            const aStart = (a.start ?? a.start_datetime) ?? '';
-            const bStart = (b.start ?? b.start_datetime) ?? '';
-            return aStart.localeCompare(bStart);
-          })
-      );
+      console.warn('No se pudieron cargar clases.', error);
+      setClasses([]);
     } finally {
       setLoadingClasses(false);
     }
-  }, [user?.venue?.id, user?.venueId, uiState.calendarMonth]);
+  }, [authStatus, user?.venue?.id, user?.venueId, uiState.calendarMonth]);
 
   useEffect(() => {
     refreshClasses();
   }, [refreshClasses]);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setBookings([]);
+        setLoadingBookings(false);
+      }
+      return;
+    }
+
     const venueId = user?.venue?.id ?? user?.venueId;
     if (!venueId) {
       setBookings([]);
@@ -1396,9 +2201,17 @@ function App() {
     return () => {
       active = false;
     };
-  }, [user?.venueId, user?.venue]);
+  }, [authStatus, user?.venueId, user?.venue]);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setPayments([]);
+        setLoadingPayments(false);
+      }
+      return;
+    }
+
     const venueId = user?.venue?.id ?? user?.venueId;
     if (!venueId) {
       setPayments([]);
@@ -1434,9 +2247,17 @@ function App() {
     return () => {
       active = false;
     };
-  }, [user?.venueId, user?.venue]);
+  }, [authStatus, user?.venueId, user?.venue]);
 
   useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      if (authStatus === 'unauthenticated') {
+        setPackageOwnerships([]);
+        setLoadingOwnerships(false);
+      }
+      return;
+    }
+
     const venueId = user?.venue?.id ?? user?.venueId;
     if (!venueId) {
       setPackageOwnerships([]);
@@ -1472,7 +2293,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [user?.venueId, user?.venue]);
+  }, [authStatus, user?.venueId, user?.venue]);
 
   useEffect(() => {
     setCreateClassForm((prev) => ({
@@ -2534,10 +3355,22 @@ function App() {
   const handleLogout = async () => {
     try {
       await fitzy.auth.logout();
-      window.location.href = '/login';
     } catch (error) {
       console.error('Error al cerrar sesión', error);
-      window.location.href = '/login';
+    } finally {
+      clearData();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      setAuthMessage('Sesión cerrada. Inicia nuevamente para continuar.');
+      setUiState({
+        activePage: 'home',
+        selectedDate: new Date(),
+        calendarMonth: startOfMonth(new Date()),
+        isAddingInstructor: false,
+        toast: '',
+      });
+      setCreateClassForm(initialClassForm(new Date()));
+      setNewInstructorForm(initialInstructorForm());
     }
   };
 
@@ -2547,7 +3380,8 @@ function App() {
     loadingClassTypes ||
     loadingBookings ||
     loadingPayments ||
-    loadingOwnerships;
+    loadingOwnerships ||
+    loadingRooms;
 
   const renderDashboard = () => {
     const formatTrend = (value) => {
@@ -2606,7 +3440,58 @@ function App() {
       return Math.max(max, columnMax);
     }, 0);
 
-    const normalizedMax = chartMax > 0 ? chartMax : 1;
+    const chartTotals = timeSeries.reduce(
+      (acc, bucket) => {
+        acc.classes += bucket.classes;
+        acc.packages += bucket.packages;
+        acc.cancellations += bucket.cancellations;
+        acc.revenue += bucket.revenue;
+        acc.booked += bucket.booked;
+        acc.capacity += bucket.capacity;
+        return acc;
+      },
+      {
+        classes: 0,
+        packages: 0,
+        cancellations: 0,
+        revenue: 0,
+        booked: 0,
+        capacity: 0,
+      }
+    );
+
+    const summaryOccupancy =
+      chartTotals.capacity > 0
+        ? Math.round((chartTotals.booked / chartTotals.capacity) * 100)
+        : chartTotals.booked > 0
+          ? 100
+          : 0;
+
+    const summaryCancellationRate =
+      chartTotals.booked + chartTotals.cancellations > 0
+        ? Math.round(
+            (chartTotals.cancellations / (chartTotals.booked + chartTotals.cancellations)) * 100
+          )
+        : 0;
+
+    const chartSummary = {
+      classes: chartTotals.classes,
+      packages: chartTotals.packages,
+      occupancy: summaryOccupancy,
+      cancellations: chartTotals.cancellations,
+      cancellationRate: summaryCancellationRate,
+      booked: chartTotals.booked,
+      revenue: chartTotals.revenue,
+      capacity: chartTotals.capacity,
+    };
+
+    const axisTicks = filters.normalize
+      ? [0, 25, 50, 75, 100]
+      : buildAxisTicks(chartMax, { minTicks: 4 });
+
+    const scaleMaxCandidate =
+      filters.normalize ? 100 : axisTicks[axisTicks.length - 1] ?? chartMax;
+    const chartScaleMax = scaleMaxCandidate > 0 ? scaleMaxCandidate : 1;
     const chartIsEmpty = !chartColumns.some((column) =>
       column.series.some((serie) => Number.isFinite(serie.value) && serie.value > 0)
     );
@@ -2680,168 +3565,256 @@ function App() {
               </div>
 
               <div
-                className="filter-bar"
+                className="chart-toolbar"
                 role="toolbar"
                 aria-label="Filtros del gráfico Clases vs Paquetes"
               >
-                <div className="filter-group">
-                  <span className="filter-label">Series</span>
-                  <div className="segmented-control" role="radiogroup" aria-label="Series">
-                    {seriesOptions.map((option) => (
+                <div className="chart-toolbar-row">
+                  <div className="filter-group">
+                    <span className="filter-label">Series</span>
+                    <div className="segmented-control" role="radiogroup" aria-label="Series">
+                      {seriesOptions.map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          className={`segment ${
+                            filters.seriesMode === option.key ? 'segment--active' : ''
+                          }`}
+                          role="radio"
+                          aria-checked={filters.seriesMode === option.key}
+                          onClick={() => handleFilterChange('seriesMode', option.key)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div
+                    className="chart-toolbar-actions"
+                    role="group"
+                    aria-label="Opciones de visualización"
+                  >
+                    <button
+                      type="button"
+                      className={`toggle toggle--pill ${filters.normalize ? 'toggle--active' : ''}`}
+                      aria-pressed={filters.normalize}
+                      onClick={() => handleFilterToggle('normalize')}
+                    >
+                      Normalizar por aforo
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle toggle--pill ${
+                        filters.showCancellations ? 'toggle--active' : ''
+                      }`}
+                      aria-pressed={filters.showCancellations}
+                      onClick={() => handleFilterToggle('showCancellations')}
+                    >
+                      Ver cancelaciones
+                    </button>
+                  </div>
+
+                  <div className="chart-toolbar-spacer" />
+
+                  <div className="export-menu">
+                    <span className="filter-label">Exportar</span>
+                    <div className="export-actions">
                       <button
-                        key={option.key}
                         type="button"
-                        className={`segment ${
-                          filters.seriesMode === option.key ? 'segment--active' : ''
-                        }`}
-                        role="radio"
-                        aria-checked={filters.seriesMode === option.key}
-                        onClick={() => handleFilterChange('seriesMode', option.key)}
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => handleExport('png')}
                       >
-                        {option.label}
+                        PNG
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => handleExport('csv')}
+                      >
+                        CSV
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <label className="filter-control">
-                  <span className="filter-label">Periodo</span>
-                  <select
-                    className="control control--sm"
-                    value={filters.range}
-                    onChange={(event) => handleFilterChange('range', event.target.value)}
-                  >
-                    <option value="7d">Últimos 7 días</option>
-                    <option value="30d">Últimos 30 días</option>
-                    <option value="6m">Últimos 6 meses</option>
-                    <option value="ytd">Año actual</option>
-                    <option value="custom">Personalizado</option>
-                  </select>
-                </label>
-
-                {filters.range === 'custom' ? (
-                  <div className="filter-dates">
-                    <label className="filter-control">
-                      <span className="filter-label">Desde</span>
-                      <input
-                        type="date"
-                        className="control control--sm"
-                        value={filters.customStart}
-                        onChange={(event) =>
-                          handleCustomRangeChange('customStart', event.target.value)
-                        }
-                      />
-                    </label>
-                    <label className="filter-control">
-                      <span className="filter-label">Hasta</span>
-                      <input
-                        type="date"
-                        className="control control--sm"
-                        value={filters.customEnd}
-                        onChange={(event) =>
-                          handleCustomRangeChange('customEnd', event.target.value)
-                        }
-                      />
-                    </label>
-                  </div>
-                ) : null}
-
-                <label className="filter-control">
-                  <span className="filter-label">Intervalo</span>
-                  <select
-                    className="control control--sm"
-                    value={filters.interval}
-                    onChange={(event) => handleFilterChange('interval', event.target.value)}
-                  >
-                    <option value="auto">Automático</option>
-                    <option value="day">Día</option>
-                    <option value="week">Semana</option>
-                    <option value="month">Mes</option>
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  className={`toggle ${filters.normalize ? 'toggle--active' : ''}`}
-                  aria-pressed={filters.normalize}
-                  onClick={() => handleFilterToggle('normalize')}
-                >
-                  Normalizar por aforo
-                </button>
-
-                <button
-                  type="button"
-                  className={`toggle ${filters.showCancellations ? 'toggle--active' : ''}`}
-                  aria-pressed={filters.showCancellations}
-                  onClick={() => handleFilterToggle('showCancellations')}
-                >
-                  Ver cancelaciones
-                </button>
-
-                <div className="export-menu">
-                  <span className="filter-label">Exportar</span>
-                  <div className="export-actions">
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      onClick={() => handleExport('png')}
+                <div className="chart-toolbar-row chart-toolbar-row--filters">
+                  <label className="filter-control">
+                    <span className="filter-label">Periodo</span>
+                    <select
+                      className="control control--sm"
+                      value={filters.range}
+                      onChange={(event) => handleFilterChange('range', event.target.value)}
                     >
-                      PNG
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      onClick={() => handleExport('csv')}
+                      <option value="7d">Últimos 7 días</option>
+                      <option value="30d">Últimos 30 días</option>
+                      <option value="6m">Últimos 6 meses</option>
+                      <option value="ytd">Año actual</option>
+                      <option value="custom">Personalizado</option>
+                    </select>
+                  </label>
+
+                  {filters.range === 'custom' ? (
+                    <div className="filter-dates">
+                      <label className="filter-control">
+                        <span className="filter-label">Desde</span>
+                        <input
+                          type="date"
+                          className="control control--sm"
+                          value={filters.customStart}
+                          onChange={(event) =>
+                            handleCustomRangeChange('customStart', event.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="filter-control">
+                        <span className="filter-label">Hasta</span>
+                        <input
+                          type="date"
+                          className="control control--sm"
+                          value={filters.customEnd}
+                          onChange={(event) =>
+                            handleCustomRangeChange('customEnd', event.target.value)
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+
+                  <label className="filter-control">
+                    <span className="filter-label">Intervalo</span>
+                    <select
+                      className="control control--sm"
+                      value={filters.interval}
+                      onChange={(event) => handleFilterChange('interval', event.target.value)}
                     >
-                      CSV
-                    </button>
-                  </div>
+                      <option value="auto">Automático</option>
+                      <option value="day">Día</option>
+                      <option value="week">Semana</option>
+                      <option value="month">Mes</option>
+                    </select>
+                  </label>
                 </div>
               </div>
 
               <div className="chart-body">
-                <div className="chart-legend">
-                  {chartLegend.map((item) => (
-                    <span
-                      key={item.key}
-                      className={`chart-legend-item chart-legend-item--${item.key}`}
-                    >
-                      {item.label}
+                <div className="chart-summary" aria-label="Resumen del gráfico">
+                  <div className="chart-summary-item">
+                    <span className="chart-summary-label">Clases programadas</span>
+                    <span className="chart-summary-value">{formatNumber(chartSummary.classes)}</span>
+                    <span className="chart-summary-hint">En el periodo seleccionado</span>
+                  </div>
+                  <div className="chart-summary-item">
+                    <span className="chart-summary-label">Paquetes vendidos</span>
+                    <span className="chart-summary-value">{formatNumber(chartSummary.packages)}</span>
+                    <span className="chart-summary-hint">Altas totales</span>
+                  </div>
+                  <div className="chart-summary-item">
+                    <span className="chart-summary-label">Ocupación promedio</span>
+                    <span className="chart-summary-value">{chartSummary.occupancy}%</span>
+                    <span className="chart-summary-hint">
+                      {chartSummary.capacity > 0
+                        ? `${formatNumber(chartSummary.booked)} plazas ocupadas`
+                        : 'Sin datos de aforo'}
                     </span>
-                  ))}
+                  </div>
+                  <div className="chart-summary-item">
+                    <span className="chart-summary-label">Cancelaciones</span>
+                    <span className="chart-summary-value">
+                      {formatNumber(chartSummary.cancellations)}
+                      {chartSummary.cancellationRate > 0
+                        ? ` · ${chartSummary.cancellationRate}%`
+                        : ''}
+                    </span>
+                    <span className="chart-summary-hint">Sobre reservas registradas</span>
+                  </div>
                 </div>
 
-                {chartIsEmpty ? (
-                  <div className="empty-state empty-state--compact">
-                    Sin datos en el rango seleccionado. Ajusta los filtros.
-                  </div>
-                ) : (
-                  <div className="chart-bars">
-                    {chartColumns.map((column) => (
-                      <div key={column.key} className="chart-bar">
-                        <div
-                          className="chart-bar-group"
-                          title={`Ocupación ${column.meta.occupancyPct}% · ${formatCurrency(column.meta.revenue)}`}
-                        >
-                          {column.series.map((serie) => (
-                            <div
-                              key={serie.key}
-                              className={`chart-bar-item chart-bar-item--${serie.tone}`}
-                              style={{
-                                height: `${Math.max(
-                                  4,
-                                  Math.round((serie.value / normalizedMax) * 100)
-                                )}%`,
-                              }}
-                              aria-label={`${serie.label}: ${serie.value}`}
-                            />
-                          ))}
-                        </div>
-                        <span className="chart-bar-label">{column.label}</span>
-                      </div>
+                {chartLegend.length ? (
+                  <div className="chart-legend">
+                    {chartLegend.map((item) => (
+                      <span
+                        key={item.key}
+                        className={`chart-legend-item chart-legend-item--${item.key}`}
+                      >
+                        {item.label}
+                      </span>
                     ))}
                   </div>
-                )}
+                ) : null}
+
+                <div className="chart-visual">
+                  <div className="chart-axis" aria-hidden="true">
+                    <div className="chart-axis-track">
+                      {axisTicks.map((tick) => (
+                        <span
+                          key={`axis-${tick}`}
+                          className="chart-axis-label"
+                          style={{ bottom: `${(tick / chartScaleMax) * 100}%` }}
+                        >
+                          {filters.normalize ? `${tick}%` : formatNumber(tick)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="chart-plot">
+                    <div className="chart-guides">
+                      {axisTicks.map((tick) => {
+                        const guideClassName = [
+                          'chart-guide-line',
+                          tick === chartScaleMax ? 'chart-guide-line--major' : '',
+                          tick === 0 ? 'chart-guide-line--baseline' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ');
+                        return (
+                          <span
+                            key={`guide-${tick}`}
+                            className={guideClassName}
+                            style={{ bottom: `${(tick / chartScaleMax) * 100}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+                    {chartIsEmpty ? (
+                      <div className="empty-state empty-state--compact chart-empty-state">
+                        Sin datos en el rango seleccionado. Ajusta los filtros.
+                      </div>
+                    ) : (
+                      <div className="chart-bars">
+                        {chartColumns.map((column) => (
+                          <div key={column.key} className="chart-bar">
+                            <div
+                              className="chart-bar-group"
+                              title={`Ocupación ${column.meta.occupancyPct}% · ${formatCurrency(column.meta.revenue)}`}
+                            >
+                              {column.series.map((serie) => {
+                                const valueLabel =
+                                  filters.normalize && serie.key === 'occupancy'
+                                    ? `${serie.value}%`
+                                    : formatNumber(serie.value);
+                                return (
+                                  <div
+                                    key={serie.key}
+                                    className={`chart-bar-item chart-bar-item--${serie.tone}`}
+                                    style={{
+                                      height: `${Math.max(
+                                        4,
+                                        Math.round((serie.value / chartScaleMax) * 100)
+                                      )}%`,
+                                    }}
+                                    aria-label={`${serie.label}: ${valueLabel}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <span className="chart-bar-label">{column.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="insights-inline">
@@ -3500,6 +4473,30 @@ function App() {
       </div>
     );
   };
+
+
+  if (authStatus === 'loading') {
+    return (
+      <div className="auth-shell auth-shell--loading">
+        <div className="auth-loading-card">
+          <div className="logo-badge">
+            <Icon name="bolt" size={20} />
+          </div>
+          <p className="auth-loading-text">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus !== 'authenticated' || !user) {
+    return (
+      <AuthScreen
+        onSuccess={handleAuthSuccess}
+        message={authMessage}
+        onPending={setAuthMessage}
+      />
+    );
+  }
 
 
   return (

@@ -41,6 +41,10 @@ function createEntitiesApi(http) {
     create: (payload) => create('/venues', payload),
     update: (id, payload) => update('/venues', id, payload),
     delete: (id) => destroy('/venues', id),
+    approve: (id, payload) =>
+      http.post(`/venues/${id}/approve`, payload).then((response) => response.data),
+    reject: (id, payload) =>
+      http.post(`/venues/${id}/reject`, payload).then((response) => response.data),
   };
 
   const ClassType = {

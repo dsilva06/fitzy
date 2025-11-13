@@ -79,3 +79,9 @@ export function getPageNameFromPath(pathname: string | null | undefined) {
 
     return slugToPageName(segment) ?? 'Home';
 }
+
+export function getLocalToday(): Date {
+    const now = new Date();
+    now.setHours(12, 0, 0, 0);
+    return now;
+}

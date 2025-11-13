@@ -13,7 +13,7 @@ const PackageCard = ({ ownership, pkg, venue, onCardClick, onBuyAgain, onHide, i
 
   const ScopeChip = () => {
     if (venue) {
-      return <div className="flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full"><Building className="w-3 h-3" />{venue.name}</div>;
+      return <div className="flex items-center gap-1.5 bg-brand-100 text-brand-700 text-xs font-semibold px-2 py-1 rounded-full"><Building className="w-3 h-3" />{venue.name}</div>;
     }
     if (pkg.category_name) {
       return <div className="flex items-center gap-1.5 bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-1 rounded-full"><Tag className="w-3 h-3" />{pkg.category_name}</div>;
@@ -42,7 +42,7 @@ const PackageCard = ({ ownership, pkg, venue, onCardClick, onBuyAgain, onHide, i
 
         {!isExpired && (
           <div className="flex items-baseline gap-2 mb-3">
-            <span className="text-4xl font-bold text-blue-600">{ownership.credits_remaining}</span>
+            <span className="text-4xl font-bold text-brand-600">{ownership.credits_remaining}</span>
             <span className="text-gray-600 font-medium">credits left</span>
           </div>
         )}
@@ -67,7 +67,7 @@ const PackageCard = ({ ownership, pkg, venue, onCardClick, onBuyAgain, onHide, i
             <Trash2 className="w-4 h-4" />
             Hide
           </button>
-          <button onClick={onBuyAgain} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 transition-colors">
+          <button onClick={onBuyAgain} className="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg text-sm hover:bg-brand-700 transition-colors">
             Buy again
           </button>
         </div>
@@ -143,13 +143,13 @@ export default function PackagesPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`relative py-3 px-4 text-base font-semibold transition-colors ${
-              activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab.id ? 'text-brand-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {tab.label}
             {activeTab === tab.id && (
               <motion.div
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-600"
                 layoutId="packagesUnderline"
               />
             )}
@@ -204,7 +204,7 @@ export default function PackagesPage() {
       {lastHiddenId && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-4">
           <span>Package hidden.</span>
-          <button onClick={handleUndoHide} className="flex items-center gap-1.5 font-semibold text-blue-300 hover:text-blue-200">
+          <button onClick={handleUndoHide} className="flex items-center gap-1.5 font-semibold text-brand-300 hover:text-brand-200">
             <Undo2 className="w-4 h-4" />
             Undo
           </button>

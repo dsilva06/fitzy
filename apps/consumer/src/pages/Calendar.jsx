@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, getLocalToday } from "@/utils";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin, User as UserIcon, Calendar as CalendarIcon, ListChecks } from "lucide-react";
@@ -9,12 +9,10 @@ import { format, isAfter, isSameDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import DateStrip from "../components/shared/DateStrip";
 
-const DEMO_TODAY = new Date('2024-08-01T12:00:00Z');
-
 export default function CalendarPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("reservations");
-  const [selectedDate, setSelectedDate] = useState(DEMO_TODAY);
+  const [selectedDate, setSelectedDate] = useState(() => getLocalToday());
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -60,7 +58,7 @@ export default function CalendarPage() {
     return session && isSameDay(new Date(session.start_datetime), selectedDate);
   });
 
-  const now = DEMO_TODAY;
+  const now = new Date();
   const upcomingBookings = dateFilteredBookings.filter(b => {
     const session = sessions.find(s => s.id === b.session_id);
     return session && isAfter(new Date(session.start_datetime), now) && b.status === "confirmed";
@@ -153,13 +151,13 @@ export default function CalendarPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`relative py-3.5 px-4 text-base font-semibold transition-colors ${
-                activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                activeTab === tab.id ? 'text-brand-600' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {tab.label}
               {activeTab === tab.id && (
                 <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full"
+                  className="absolute bottom-0 left-0 right-0 h-1 bg-brand-600 rounded-full"
                   layoutId="underline"
                 />
               )}

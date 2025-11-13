@@ -196,8 +196,8 @@ export default function AddPaymentMethodSheet({ onClose, onSuccess }) {
                     className="w-full flex items-center justify-between p-4 bg-white rounded-xl shadow-sm hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 flex items-center justify-center bg-blue-100 rounded-lg">
-                         <method.icon className="w-5 h-5 text-blue-600"/>
+                      <div className="w-10 h-10 flex items-center justify-center bg-brand-100 rounded-lg">
+                         <method.icon className="w-5 h-5 text-brand-600"/>
                       </div>
                       <span className="font-semibold text-gray-800">{method.label}</span>
                     </div>

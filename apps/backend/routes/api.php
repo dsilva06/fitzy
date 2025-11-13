@@ -15,6 +15,7 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
+    Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function (): void {
@@ -63,5 +64,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('packages', [PackageController::class, 'store']);
         Route::put('packages/{package}', [PackageController::class, 'update']);
         Route::delete('packages/{package}', [PackageController::class, 'destroy']);
+    });
+
+    Route::middleware('role:owner')->group(function (): void {
+        Route::post('venues/{venue}/approve', [VenueController::class, 'approve']);
+        Route::post('venues/{venue}/reject', [VenueController::class, 'reject']);
     });
 });

@@ -171,38 +171,38 @@ export default function CheckoutSheet({ session, venue, classType, onClose, onSu
 
               {/* Booking Summary */}
               <div className="p-6 space-y-4">
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-5">
+                <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl p-5">
                   <h3 className="font-bold text-xl text-gray-900 mb-4">
                     {classType?.name || "Class"}
                   </h3>
                   
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-3 text-gray-700">
-                      <MapPin className="w-4 h-4 text-blue-600" />
+                      <MapPin className="w-4 h-4 text-brand-600" />
                       <span className="font-medium">{venue.name}</span>
                     </div>
                     
                     <div className="flex items-center gap-3 text-gray-700">
-                      <Clock className="w-4 h-4 text-blue-600" />
+                      <Clock className="w-4 h-4 text-brand-600" />
                       <span>
                         {format(new Date(session.start_datetime), "EEEE, MMM d 'at' h:mm a")}
                       </span>
                     </div>
                     
                     <div className="flex items-center gap-3 text-gray-700">
-                      <UserIcon className="w-4 h-4 text-blue-600" />
+                      <UserIcon className="w-4 h-4 text-brand-600" />
                       <span>Coach: {session.coach_name} • {duration} min</span>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-blue-100 flex justify-between items-center">
+                  <div className="mt-4 pt-4 border-t border-brand-100 flex justify-between items-center">
                     <div>
                       <p className="text-sm text-gray-600">Price</p>
                       <p className="text-2xl font-bold text-gray-900">${session.price}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-600">or</p>
-                      <p className="text-xl font-bold text-blue-600">{session.credit_cost} credits</p>
+                      <p className="text-xl font-bold text-brand-600">{session.credit_cost} credits</p>
                     </div>
                   </div>
                 </div>
@@ -228,7 +228,7 @@ export default function CheckoutSheet({ session, venue, classType, onClose, onSu
                 <button
                   onClick={handleConfirm}
                   disabled={!selectedPaymentMethod || isProcessing}
-                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-2xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-bold text-lg rounded-2xl hover:from-brand-700 hover:to-brand-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                 >
                   {isProcessing ? (
                     <>

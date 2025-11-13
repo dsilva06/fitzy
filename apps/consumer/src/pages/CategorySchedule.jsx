@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { getLocalToday } from "@/utils";
 import { useQuery } from "@tanstack/react-query";
 import { fitzy } from "@/api/fitzyClient";
 import { format, isSameDay } from "date-fns";
@@ -10,15 +10,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import DateStrip from "../components/shared/DateStrip";
 import CheckoutSheet from "../components/checkout/CheckoutSheet";
 
-const DEMO_TODAY = new Date('2024-08-01T12:00:00Z');
-
 export default function CategorySchedulePage() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const categoryName = urlParams.get('category');
 
   const [activeTab, setActiveTab] = useState("classes");
-  const [selectedDate, setSelectedDate] = useState(DEMO_TODAY);
+  const [selectedDate, setSelectedDate] = useState(() => getLocalToday());
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null); // Can be a session or a package
   
@@ -63,13 +61,13 @@ export default function CategorySchedulePage() {
         </div>
 
         <div className="flex border-b border-gray-200 mb-6">
-          <button onClick={() => setActiveTab("classes")} className={`relative py-3 px-4 text-base font-semibold transition-colors ${activeTab === "classes" ? "text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+          <button onClick={() => setActiveTab("classes")} className={`relative py-3 px-4 text-base font-semibold transition-colors ${activeTab === "classes" ? "text-brand-600" : "text-gray-500 hover:text-gray-700"}`}>
             Classes
-            {activeTab === "classes" && <motion.div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600" layoutId="catScheduleUnderline" />}
+            {activeTab === "classes" && <motion.div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-600" layoutId="catScheduleUnderline" />}
           </button>
-          <button onClick={() => setActiveTab("packages")} className={`relative py-3 px-4 text-base font-semibold transition-colors ${activeTab === "packages" ? "text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+          <button onClick={() => setActiveTab("packages")} className={`relative py-3 px-4 text-base font-semibold transition-colors ${activeTab === "packages" ? "text-brand-600" : "text-gray-500 hover:text-gray-700"}`}>
             Packages
-            {activeTab === "packages" && <motion.div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600" layoutId="catScheduleUnderline" />}
+            {activeTab === "packages" && <motion.div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-600" layoutId="catScheduleUnderline" />}
           </button>
         </div>
       </div>
@@ -94,14 +92,14 @@ export default function CategorySchedulePage() {
                     </div>
                     <div className="text-right">
                        <p className="font-bold text-gray-800">${session.price}</p>
-                       <p className="text-xs text-blue-600 font-medium">{session.credit_cost} credits</p>
+                       <p className="text-xs text-brand-600 font-medium">{session.credit_cost} credits</p>
                     </div>
                   </div>
                    <div className="flex justify-between items-center mt-2">
                       <span className={`text-xs font-medium ${isFull ? "text-red-600" : "text-green-600"}`}>
                         {isFull ? "Full" : `${capacityLeft} spot${capacityLeft > 1 ? 's' : ''} left`}
                       </span>
-                      <button onClick={() => handleBookSession(session)} disabled={isFull} className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isFull ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                      <button onClick={() => handleBookSession(session)} disabled={isFull} className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isFull ? 'bg-gray-200 text-gray-600' : 'bg-brand-600 text-white hover:bg-brand-700'}`}>
                         {isFull ? "Waitlist" : "Book"}
                       </button>
                     </div>
@@ -119,7 +117,7 @@ export default function CategorySchedulePage() {
            {filteredPackages.map(pkg => {
               const venue = venues.find(v => v.id === pkg.venue_id);
               const ScopeChip = () => {
-                if (venue) return <div className="flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full"><Building className="w-3 h-3" />{venue.name}</div>;
+                if (venue) return <div className="flex items-center gap-1.5 bg-brand-100 text-brand-700 text-xs font-semibold px-2 py-1 rounded-full"><Building className="w-3 h-3" />{venue.name}</div>;
                 if (pkg.category_name) return <div className="flex items-center gap-1.5 bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-1 rounded-full"><Tag className="w-3 h-3" />{pkg.category_name} only</div>;
                 return <div className="flex items-center gap-1.5 bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-1 rounded-full"><Globe className="w-3 h-3" />All venues</div>;
               };
@@ -134,7 +132,7 @@ export default function CategorySchedulePage() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-3xl font-bold text-gray-900">${pkg.price}</span>
-                  <button onClick={() => handleBuyPackage(pkg)} className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+                  <button onClick={() => handleBuyPackage(pkg)} className="px-6 py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors">
                     Buy
                   </button>
                 </div>

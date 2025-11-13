@@ -13,9 +13,14 @@
   --color-surface: #f8faff;
   --color-text: #1f2432;
   --color-muted: #6c7384;
-  --color-primary: #0a84ff;
-  --color-primary-strong: #0060df;
-  --color-accent: #5bd2ff;
+  --color-primary: #a6c1ce;
+  --color-primary-rgb: 166, 193, 206;
+  --color-primary-strong: #7e99a6;
+  --color-primary-strong-rgb: 126, 153, 166;
+  --color-accent: #c4dfec;
+  --color-accent-rgb: 196, 223, 236;
+  --color-accent-strong: #9fcfe0;
+  --color-accent-strong-rgb: 159, 207, 224;
   --color-border: rgba(15, 23, 42, 0.08);
   --radius-card: 16px;
   --radius-control: 12px;

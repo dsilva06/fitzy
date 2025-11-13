@@ -79,14 +79,14 @@ export default function ReservationDetailsPage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Reservation Details</h1>
 
       {/* Main Card */}
-      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl p-6 mb-6">
+      <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-3xl p-6 mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
           {classType?.name || "Class"}
         </h2>
 
         <div className="space-y-3 text-gray-700">
           <div className="flex items-start gap-3">
-            <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
+            <MapPin className="w-5 h-5 text-brand-600 mt-0.5" />
             <div>
               <p className="font-semibold">{venue.name}</p>
               <p className="text-sm text-gray-600">{venue.neighborhood}, {venue.city}</p>
@@ -94,19 +94,19 @@ export default function ReservationDetailsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <CalendarIcon className="w-5 h-5 text-blue-600" />
+            <CalendarIcon className="w-5 h-5 text-brand-600" />
             <span>{format(new Date(session.start_datetime), "EEEE, MMMM d, yyyy")}</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <Clock className="w-5 h-5 text-blue-600" />
+            <Clock className="w-5 h-5 text-brand-600" />
             <span>
               {format(new Date(session.start_datetime), "h:mm a")} - {format(new Date(session.end_datetime), "h:mm a")}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <UserIcon className="w-5 h-5 text-blue-600" />
+            <UserIcon className="w-5 h-5 text-brand-600" />
             <span>Coach: {session.coach_name}</span>
           </div>
         </div>
@@ -116,8 +116,8 @@ export default function ReservationDetailsPage() {
       <div className="space-y-4 mb-8">
         <div className="bg-white rounded-2xl p-5 shadow-md">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-brand-600" />
             </div>
             <h3 className="font-semibold text-gray-900">Payment</h3>
           </div>

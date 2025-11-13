@@ -79,7 +79,7 @@ export default function WalletPage() {
       <div className="mb-8">
         <button
           onClick={() => setAddSheetOpen(true)}
-          className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-transform transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+          className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-brand-600 text-white font-bold rounded-2xl hover:bg-brand-700 transition-transform transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
         >
           <Plus className="w-5 h-5" />
           Add Payment Method

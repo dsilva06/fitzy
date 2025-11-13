@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\VenueStatus;
 use App\Models\ClassSession;
 use App\Models\Package;
 use App\Models\Favorite;
+use App\Models\User;
 
 class Venue extends Model
 {
@@ -20,10 +22,19 @@ class Venue extends Model
         'rating',
         'logo_url',
         'description',
+        'status',
+        'status_note',
+        'approved_at',
+        'approved_by',
     ];
 
     protected $casts = [
         'rating' => 'float',
+        'approved_at' => 'datetime',
+    ];
+
+    protected $attributes = [
+        'status' => VenueStatus::Pending->value,
     ];
 
     public function sessions()
@@ -39,5 +50,15 @@ class Venue extends Model
     public function favorites()
     {
         return $this->hasMany(Favorite::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function venueAdmins()
+    {
+        return $this->hasMany(User::class)->where('role', 'venue_admin');
     }
 }

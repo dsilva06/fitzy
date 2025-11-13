@@ -40,6 +40,60 @@ function createAuthApi(http, options = {}) {
     return user;
   };
 
+  const register = async ({
+    email,
+    password,
+    firstName,
+    lastName,
+    phone,
+    role,
+    venueId,
+    venueName,
+    venueCity,
+    venueNeighborhood,
+    venueAddress,
+    venueDescription,
+    deviceName,
+  } = {}) => {
+    const response = await http.post("/auth/register", {
+      email,
+      password,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      role,
+      venue_id: venueId,
+      venue_name: venueName,
+      venue_city: venueCity,
+      venue_neighborhood: venueNeighborhood,
+      venue_address: venueAddress,
+      venue_description: venueDescription,
+      device_name: deviceName ?? "web-client",
+    });
+
+    const payload = response.data ?? {};
+    const token = payload.token ?? null;
+    const user = payload.user ?? null;
+    const pending = Boolean(payload.pending);
+
+    if (token) {
+      setStoredToken(token);
+      applyAuthHeader(http, token);
+      setDemoSkip(false);
+      cachedUser = user;
+    } else {
+      cachedUser = null;
+    }
+
+    return {
+      user,
+      token,
+      pending,
+      status: payload.status ?? null,
+      message: payload.message ?? null,
+    };
+  };
+
   const ensureDemoSession = async () => {
     if (!demoCredentials?.email || !demoCredentials?.password) {
       return null;
@@ -105,6 +159,7 @@ function createAuthApi(http, options = {}) {
 
   return {
     login,
+    register,
     me,
     logout,
     updateMe,

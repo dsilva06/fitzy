@@ -7,13 +7,12 @@ import { Heart, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VenueCard from "../components/shared/VenueCard";
 import CheckoutSheet from "../components/checkout/CheckoutSheet";
-
-const DEMO_TODAY = new Date('2024-08-01T12:00:00Z');
+import { getLocalToday } from "@/utils";
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("classes");
-  const [selectedDate] = useState(DEMO_TODAY);
+  const [selectedDate] = useState(() => getLocalToday());
   const [selectedSession, setSelectedSession] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
 
@@ -97,13 +96,13 @@ export default function FavoritesPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`relative py-3 px-4 text-base font-semibold transition-colors ${
-              activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab.id ? 'text-brand-600' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {tab.label}
             {activeTab === tab.id && (
               <motion.div
-                className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-full"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-brand-600 rounded-full"
                 layoutId="favoritesUnderline"
               />
             )}

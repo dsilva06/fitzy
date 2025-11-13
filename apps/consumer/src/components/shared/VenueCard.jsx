@@ -116,7 +116,7 @@ export default function VenueCard({ venue, selectedDate, onSessionSelect, onWait
                                             </div>
                                             <div className="text-right flex-shrink-0 pl-2">
                                                 <p className="font-bold text-gray-800">${session.price}</p>
-                                                <p className="text-xs text-blue-600 font-medium">{session.credit_cost} credits</p>
+                                                <p className="text-xs text-brand-600 font-medium">{session.credit_cost} credits</p>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center mt-2">
@@ -125,7 +125,7 @@ export default function VenueCard({ venue, selectedDate, onSessionSelect, onWait
                                             </span>
                                             <button
                                                 onClick={() => isFull ? onWaitlistClick(session) : onSessionSelect(session)}
-                                                className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isFull ? 'bg-gray-200 text-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                                                className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isFull ? 'bg-gray-200 text-gray-600' : 'bg-brand-600 text-white hover:bg-brand-700'}`}
                                             >
                                                 {isFull ? "Waitlist" : "Book"}
                                             </button>

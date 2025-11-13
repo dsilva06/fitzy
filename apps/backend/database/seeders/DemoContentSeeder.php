@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\VenueStatus;
 use App\Models\Booking;
 use App\Models\ClassSession;
 use App\Models\ClassType;
@@ -66,8 +67,17 @@ class DemoContentSeeder extends Seeder
             ],
         ];
 
-        $venues = collect($venuesData)->mapWithKeys(function (array $data) {
-            $venue = Venue::updateOrCreate(['name' => $data['name']], $data);
+        $venues = collect($venuesData)->mapWithKeys(function (array $data) use ($owner) {
+            $venue = Venue::updateOrCreate(
+                ['name' => $data['name']],
+                array_merge($data, ['status' => VenueStatus::Approved->value])
+            );
+
+            $venue->forceFill([
+                'approved_at' => now(),
+                'approved_by' => $owner->id,
+            ])->save();
+
             return [$venue->name => $venue];
         });
 

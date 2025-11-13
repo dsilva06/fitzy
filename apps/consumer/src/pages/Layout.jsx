@@ -1,23 +1,17 @@
 
 
-import React, { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Home, Compass, Calendar, Package, Wallet, CreditCard, Heart, Settings, HelpCircle, LogOut, X, User as UserIcon } from "lucide-react";
-import { fitzy } from "@/api/fitzyClient";
-import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const { data: user } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: () => fitzy.auth.me(),
-    initialData: null,
-  });
+  const { user, logout } = useAuth();
 
   const navItems = [
     { name: "Home", path: createPageUrl("Home"), icon: Home },
@@ -34,7 +28,7 @@ export default function Layout({ children, currentPageName }) {
   ];
 
   const ProfileAvatar = ({ size = "w-12 h-12", textSize = "text-lg" }) => (
-    <div className={`rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg flex items-center justify-center text-white font-semibold ${size} ${textSize} overflow-hidden`}>
+    <div className={`rounded-full bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg flex items-center justify-center text-white font-semibold ${size} ${textSize} overflow-hidden`}>
       {user?.profile_picture_url ? (
         <img src={user.profile_picture_url} alt="Profile" className="w-full h-full object-cover" />
       ) : (
@@ -55,9 +49,9 @@ export default function Layout({ children, currentPageName }) {
     <div className={`min-h-screen bg-[#FAFAF9] ${isMainPage ? 'pb-24' : ''}`}>
       <style>{`
         :root {
-          --primary-500: #3B82F6;
-          --primary-600: #2563EB;
-          --primary-700: #1D4ED8;
+          --primary-500: #a6c1ce;
+          --primary-600: #7ba3b7;
+          --primary-700: #5b8ca4;
           --success-500: #10B981;
           --warning-500: #F59E0B;
           --error-500: #EF4444;
@@ -68,7 +62,13 @@ export default function Layout({ children, currentPageName }) {
       {isMainPage && (
         <div className="fixed top-5 left-4 z-50">
           <button
-            onClick={() => setDrawerOpen(true)}
+            onClick={() => {
+              if (user) {
+                setDrawerOpen(true);
+              } else {
+                navigate('/login');
+              }
+            }}
             className="hover:scale-105 transition-transform"
           >
             <ProfileAvatar />
@@ -125,7 +125,7 @@ export default function Layout({ children, currentPageName }) {
                       onClick={() => handleDrawerNavigate(item.path + (item.hash || ""))}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
                     >
-                      <item.icon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                      <item.icon className="w-5 h-5 text-gray-400 group-hover:text-brand-600 transition-colors" />
                       <span className="font-medium text-gray-700 group-hover:text-gray-900">
                         {item.name}
                       </span>
@@ -133,7 +133,11 @@ export default function Layout({ children, currentPageName }) {
                   ))}
                   
                   <button
-                    onClick={() => fitzy.auth.logout()}
+                    onClick={async () => {
+                      await logout();
+                      setDrawerOpen(false);
+                      navigate('/login');
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-50 transition-colors group mt-4"
                   >
                     <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-600 transition-colors" />
@@ -172,12 +176,12 @@ export default function Layout({ children, currentPageName }) {
                 >
                   <item.icon 
                     className={`w-6 h-6 transition-colors ${
-                      isActive ? "text-blue-600" : "text-gray-400"
+                      isActive ? "text-brand-600" : "text-gray-400"
                     }`}
                   />
                   <span 
                     className={`text-xs font-semibold transition-colors ${
-                      isActive ? "text-blue-600" : "text-gray-500"
+                      isActive ? "text-brand-600" : "text-gray-500"
                     }`}
                   >
                     {item.name}
@@ -191,4 +195,3 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 }
-

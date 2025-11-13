@@ -1,15 +1,13 @@
 
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { createPageUrl, getLocalToday } from "@/utils";
 import { useQuery } from "@tanstack/react-query";
 import { fitzy } from "@/api/fitzyClient";
 import { format, isSameDay } from "date-fns";
 import { ChevronLeft, MapPin, Star, Heart, Clock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CheckoutSheet from "../components/checkout/CheckoutSheet";
-
-const DEMO_TODAY = new Date('2024-08-01T12:00:00Z');
 
 const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavoriteToggle, isFavorite }) => {
   const navigate = useNavigate();
@@ -61,7 +59,7 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
                 <button
                   key={session.id}
                   onClick={() => onTimeChipSelect(session, venue)}
-                  className="flex-shrink-0 px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg hover:bg-blue-200 transition-colors"
+                  className="flex-shrink-0 px-4 py-2 bg-brand-100 text-brand-700 font-semibold rounded-lg hover:bg-brand-200 transition-colors"
                 >
                   {format(new Date(session.start_datetime), "h:mm a")}
                 </button>
@@ -69,7 +67,7 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
             </div>
             <button 
               onClick={handleViewSchedule} 
-              className="mt-3 flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+              className="mt-3 flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors"
             >
               View schedule <ArrowRight className="w-4 h-4" />
             </button>
@@ -106,11 +104,12 @@ export default function CategoryResultsPage() {
   const { data: allSessions = [] } = useQuery({ queryKey: ['allSessions'], queryFn: () => fitzy.entities.Session.list() });
   
   const classType = useMemo(() => classTypes.find(c => c.name === categoryName), [classTypes, categoryName]);
+  const today = useMemo(() => getLocalToday(), []);
 
   const venuesWithTodayClasses = useMemo(() => {
     if (!classType || venues.length === 0 || allSessions.length === 0) return [];
     
-    const todaySessions = allSessions.filter(s => s.class_type_id === classType.id && isSameDay(new Date(s.start_datetime), DEMO_TODAY));
+    const todaySessions = allSessions.filter(s => s.class_type_id === classType.id && isSameDay(new Date(s.start_datetime), today));
     
     const sessionsByVenue = todaySessions.reduce((acc, session) => {
       if (!acc[session.venue_id]) {
@@ -128,7 +127,7 @@ export default function CategoryResultsPage() {
         sessions: sessionsByVenue[venueId].sort((a,b) => new Date(a.start_datetime) - new Date(b.start_datetime))
       };
     }).filter(Boolean);
-  }, [classType, venues, allSessions]);
+  }, [classType, venues, allSessions, today]);
 
   const handleTimeChipSelect = (session, venue) => {
     setSelectedSession(session);

@@ -78,7 +78,7 @@ export default function VenueSchedulePage() {
               className="w-20 h-20 rounded-2xl object-cover"
             />
           ) : (
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-2xl">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 flex items-center justify-center text-white font-bold text-2xl">
               {venue.name[0]}
             </div>
           )}
@@ -98,7 +98,7 @@ export default function VenueSchedulePage() {
           onClick={() => setActiveTab("classes")}
           className={`flex-1 py-3 rounded-2xl font-semibold transition-colors ${
             activeTab === "classes"
-              ? "bg-blue-600 text-white"
+              ? "bg-brand-600 text-white"
               : "bg-white text-gray-600"
           }`}
         >
@@ -108,7 +108,7 @@ export default function VenueSchedulePage() {
           onClick={() => setActiveTab("packages")}
           className={`flex-1 py-3 rounded-2xl font-semibold transition-colors ${
             activeTab === "packages"
-              ? "bg-blue-600 text-white"
+              ? "bg-brand-600 text-white"
               : "bg-white text-gray-600"
           }`}
         >
@@ -162,7 +162,7 @@ export default function VenueSchedulePage() {
                       className={`px-6 py-2 rounded-xl font-semibold transition-colors ${
                         isFull
                           ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-brand-600 text-white hover:bg-brand-700"
                       }`}
                     >
                       {isFull ? "Join Waitlist" : "Book"}
@@ -187,7 +187,7 @@ export default function VenueSchedulePage() {
               <p className="text-gray-600 mb-4">Valid for {pkg.validity_months} months</p>
               <div className="flex justify-between items-center">
                 <span className="text-3xl font-bold text-gray-900">${pkg.price}</span>
-                <button className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+                <button className="px-6 py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors">
                   Buy Package
                 </button>
               </div>
