@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\VenueStatus;
 use App\Models\User;
 use App\Models\Venue;
+use App\Models\Status;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +32,9 @@ class AuthController extends Controller
             'venue_neighborhood' => ['nullable', 'string', 'max:255'],
             'venue_address' => ['nullable', 'string', 'max:255'],
             'venue_description' => ['nullable', 'string'],
+            'venue_email' => ['nullable', 'email', 'max:255', 'unique:venues,email'],
+            'venue_phone' => ['nullable', 'string', 'max:20'],
+            'venue_rif' => ['nullable', 'string', 'max:50', 'unique:venues,rif'],
             'device_name' => ['sometimes', 'string'],
         ]);
 
@@ -185,13 +189,27 @@ class AuthController extends Controller
             ]);
         }
 
+        foreach (['venue_email', 'venue_phone', 'venue_rif'] as $field) {
+            if (empty($data[$field])) {
+                throw ValidationException::withMessages([
+                    $field => ['Este campo es obligatorio para registrar un nuevo venue.'],
+                ]);
+            }
+        }
+
+        $pendingStatusId = Status::idFor(Venue::class, VenueStatus::Pending->value);
+
         $venue = Venue::create([
             'name' => $data['venue_name'],
+            'email' => $data['venue_email'],
+            'phone' => $data['venue_phone'],
+            'rif' => $data['venue_rif'],
             'city' => $data['venue_city'] ?? null,
             'neighborhood' => $data['venue_neighborhood'] ?? null,
             'address' => $data['venue_address'] ?? null,
             'description' => $data['venue_description'] ?? null,
             'status' => VenueStatus::Pending->value,
+            'status_id' => $pendingStatusId,
         ]);
 
         return $venue->id;

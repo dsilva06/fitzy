@@ -70,6 +70,7 @@ export default function Register() {
       lastName: data.lastName.trim(),
       email: data.email.trim().toLowerCase(),
       password: data.password,
+      role: 'consumer',
     });
   };
 

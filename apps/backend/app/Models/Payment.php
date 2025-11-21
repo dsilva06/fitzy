@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Booking;
+use App\Models\Status;
 
 class Payment extends Model
 {
@@ -15,6 +16,7 @@ class Payment extends Model
         'method',
         'amount',
         'status',
+        'status_id',
         'meta',
     ];
 
@@ -26,5 +28,10 @@ class Payment extends Model
     public function booking()
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function statusDefinition()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
     }
 }

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import { getLocalToday } from "@/utils";
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("classes");
+  const [activeTab, setActiveTab] = useState("venues");
   const [selectedDate] = useState(() => getLocalToday());
   const [selectedSession, setSelectedSession] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -40,16 +40,26 @@ export default function FavoritesPage() {
     initialData: [],
   });
 
-  const favoriteVenues = venues.filter(v => favorites.some(f => f.venue_id === v.id));
+  const favoriteVenueIds = useMemo(() => {
+    return new Set(favorites.map(f => String(f.venue_id)));
+  }, [favorites]);
 
-  const displayedVenues = favoriteVenues.filter(venue => {
-    if (activeTab === 'classes') {
-      return venue.venue_type === 'class_studio' || venue.venue_type === 'gym';
+  const favoriteVenues = useMemo(() => {
+    return venues.filter(v => favoriteVenueIds.has(String(v.id)));
+  }, [venues, favoriteVenueIds]);
+
+  const displayedVenues = favoriteVenues.filter((venue) => {
+    const type = venue.venue_type ?? 'venue';
+
+    if (activeTab === 'venues') {
+      return type !== 'court_facility';
     }
+
     if (activeTab === 'courts') {
-      return venue.venue_type === 'court_facility' || venue.venue_type === 'gym';
+      return type === 'court_facility';
     }
-    return false;
+
+    return true;
   });
 
   const handleSessionSelect = (session) => {
@@ -72,7 +82,7 @@ export default function FavoritesPage() {
   const isLoading = favoritesLoading || venuesLoading;
 
   const tabs = [
-    { id: 'classes', label: 'Classes' },
+    { id: 'venues', label: 'Venues' },
     { id: 'courts', label: 'Courts' },
   ];
 
@@ -139,7 +149,7 @@ export default function FavoritesPage() {
                 <Heart className="w-12 h-12 text-gray-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-800">
-              No Favorite {activeTab === 'classes' ? 'Classes' : 'Courts'} Added
+              No favorite {activeTab === 'venues' ? 'venues' : 'courts'} yet
             </h2>
             <p className="text-gray-500 mt-2">
                 Tap the heart on any venue to add it to this list.

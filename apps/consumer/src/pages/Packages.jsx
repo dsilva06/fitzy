@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { toCategorySlug } from "@/utils";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,11 +106,11 @@ export default function PackagesPage() {
 
   const handleCardClick = (pkg) => {
     if (pkg.venue_id) {
-      navigate(createPageUrl("VenueSchedule") + `?venueId=${pkg.venue_id}`);
+      navigate(`/venues/${pkg.venue_id}/schedule`);
     } else if (pkg.category_name) {
-      navigate(createPageUrl("CategoryResults") + `?category=${encodeURIComponent(pkg.category_name)}`);
+      navigate(`/explore/classes/${toCategorySlug(pkg.category_name)}`);
     } else {
-      navigate(createPageUrl("Explore"));
+      navigate('/explore/classes');
     }
   };
 

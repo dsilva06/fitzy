@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\ClassSession;
 use App\Models\Payment;
+use App\Models\Status;
 
 class Booking extends Model
 {
@@ -16,6 +17,7 @@ class Booking extends Model
         'user_id',
         'session_id',
         'status',
+        'status_id',
         'cancellation_deadline',
     ];
 
@@ -36,5 +38,10 @@ class Booking extends Model
     public function payment()
     {
         return $this->hasOne(Payment::class);
+    }
+
+    public function statusDefinition()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
     }
 }

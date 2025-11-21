@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use App\Http\Requests\VenueStoreRequest;
 use App\Http\Requests\VenueUpdateRequest;
 use App\Enums\VenueStatus;
+use App\Models\Status;
 
 class VenueController extends Controller
 {
@@ -42,8 +43,13 @@ class VenueController extends Controller
     public function store(VenueStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $statusValue = $data['status'] ?? VenueStatus::Pending->value;
+        $statusId = Status::idFor(Venue::class, $statusValue);
 
-        $venue = Venue::create($data);
+        $venue = Venue::create(array_merge($data, [
+            'status' => $statusValue,
+            'status_id' => $statusId,
+        ]));
 
         return response()->json($venue, 201);
     }
@@ -66,8 +72,17 @@ class VenueController extends Controller
     public function update(VenueUpdateRequest $request, Venue $venue): JsonResponse
     {
         $data = $request->validated();
+        $statusId = null;
+
+        if (array_key_exists('status', $data)) {
+            $statusId = Status::idFor(Venue::class, $data['status']);
+        }
 
         $venue->fill($data)->save();
+
+        if ($statusId) {
+            $venue->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($venue);
     }
@@ -87,6 +102,7 @@ class VenueController extends Controller
 
         $venue->forceFill([
             'status' => VenueStatus::Approved->value,
+            'status_id' => Status::idFor(Venue::class, VenueStatus::Approved->value),
             'status_note' => $data['note'] ?? null,
             'approved_at' => now(),
             'approved_by' => $request->user()->id,
@@ -103,6 +119,7 @@ class VenueController extends Controller
 
         $venue->forceFill([
             'status' => VenueStatus::Rejected->value,
+            'status_id' => Status::idFor(Venue::class, VenueStatus::Rejected->value),
             'status_note' => $data['note'] ?? null,
             'approved_at' => null,
             'approved_by' => $request->user()->id,

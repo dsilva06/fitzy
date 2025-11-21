@@ -4,12 +4,17 @@ import Explore from "./Explore";
 import Calendar from "./Calendar";
 import Favorites from "./Favorites";
 import VenueSchedule from "./VenueSchedule";
+import VenueDetails from "./VenueDetails";
+import CourtDetails from "./CourtDetails";
 import ReservationDetails from "./ReservationDetails";
 import Packages from "./Packages";
 import PersonalInfo from "./PersonalInfo";
 import Wallet from "./Wallet";
 import CategoryResults from "./CategoryResults";
 import CategorySchedule from "./CategorySchedule";
+import CourtSchedule from "./CourtSchedule";
+import ClassDetails from "./ClassDetails";
+import CourtCategoryResults from "./CourtCategoryResults";
 import Login from "./Login.jsx";
 import Register from "./Register.jsx";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
@@ -20,14 +25,21 @@ import { createPageUrl, getPageNameFromPath } from "@/utils";
 const PAGES = {
     Home: Home,
     Explore: Explore,
+    ExploreClasses: Explore,
+    ExploreCourts: Explore,
     Calendar: Calendar,
     Favorites: Favorites,
     VenueSchedule: VenueSchedule,
+    VenueDetails: VenueDetails,
+    CourtDetails: CourtDetails,
+    CourtSchedule: CourtSchedule,
+    ClassDetails: ClassDetails,
     ReservationDetails: ReservationDetails,
     Packages: Packages,
     PersonalInfo: PersonalInfo,
     Wallet: Wallet,
     CategoryResults: CategoryResults,
+    CourtCategoryResults: CourtCategoryResults,
     CategorySchedule: CategorySchedule,
 };
 
@@ -50,13 +62,34 @@ function PagesContent() {
 
                 <Route path={createPageUrl("Explore")} element={<Layout currentPageName={currentPage}><Explore /></Layout>} />
 
+                <Route path={createPageUrl("ExploreClasses")} element={<Layout currentPageName={currentPage}><Explore /></Layout>} />
+
+                <Route path={createPageUrl("ExploreCourts")} element={<Layout currentPageName={currentPage}><Explore /></Layout>} />
+
                 <Route path={createPageUrl("Calendar")} element={<Layout currentPageName={currentPage}><Calendar /></Layout>} />
 
                 <Route path={createPageUrl("Favorites")} element={<Layout currentPageName={currentPage}><Favorites /></Layout>} />
 
-                <Route path={createPageUrl("VenueSchedule")} element={<Layout currentPageName={currentPage}><VenueSchedule /></Layout>} />
+                <Route path="/venues/:venueId" element={<Layout currentPageName={currentPage}><VenueDetails /></Layout>} />
 
-                <Route path={createPageUrl("ReservationDetails")} element={<RequireAuth><Layout currentPageName={currentPage}><ReservationDetails /></Layout></RequireAuth>} />
+                <Route path="/venues/:venueId/schedule" element={<Layout currentPageName={currentPage}><VenueSchedule /></Layout>} />
+
+                <Route path="/complexes/:complexId" element={<Layout currentPageName={currentPage}><CourtDetails /></Layout>} />
+
+                <Route path="/courts/:courtId" element={<Layout currentPageName={currentPage}><CourtSchedule /></Layout>} />
+
+                <Route path="/classes/:sessionId" element={<Layout currentPageName={currentPage}><ClassDetails /></Layout>} />
+
+                <Route
+                    path={`${createPageUrl("ReservationDetails")}/:bookingId?`}
+                    element={
+                        <RequireAuth>
+                            <Layout currentPageName={currentPage}>
+                                <ReservationDetails />
+                            </Layout>
+                        </RequireAuth>
+                    }
+                />
 
                 <Route path={createPageUrl("Packages")} element={<Layout currentPageName={currentPage}><Packages /></Layout>} />
 
@@ -64,9 +97,11 @@ function PagesContent() {
 
                 <Route path={createPageUrl("Wallet")} element={<RequireAuth><Layout currentPageName={currentPage}><Wallet /></Layout></RequireAuth>} />
 
-                <Route path={createPageUrl("CategoryResults")} element={<Layout currentPageName={currentPage}><CategoryResults /></Layout>} />
+                <Route path="/explore/classes/:categorySlug" element={<Layout currentPageName={currentPage}><CategoryResults /></Layout>} />
 
-                <Route path={createPageUrl("CategorySchedule")} element={<Layout currentPageName={currentPage}><CategorySchedule /></Layout>} />
+                <Route path="/explore/courts/:sportSlug" element={<Layout currentPageName={currentPage}><CourtCategoryResults /></Layout>} />
+
+                <Route path="/explore/classes/:categorySlug/schedule" element={<Layout currentPageName={currentPage}><CategorySchedule /></Layout>} />
 
             </Routes>
         </>

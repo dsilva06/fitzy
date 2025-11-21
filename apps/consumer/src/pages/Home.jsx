@@ -102,7 +102,7 @@ export default function HomePage() {
 
           <div className="flex gap-3">
             <button 
-              onClick={() => navigate(createPageUrl("ReservationDetails") + `?bookingId=${nextBooking.id}`)}
+              onClick={() => navigate(`${createPageUrl("ReservationDetails")}/${encodeURIComponent(nextBooking.id)}`)}
               className="flex-1 bg-white text-brand-600 font-bold py-3.5 rounded-2xl hover:bg-brand-50 transition-colors"
             >
               Open details
@@ -127,7 +127,7 @@ export default function HomePage() {
         <h3 className="font-bold text-xl text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 gap-4">
           <button
-            onClick={() => navigate(createPageUrl("Explore"))}
+            onClick={() => navigate(createPageUrl("ExploreClasses"))}
             className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg border border-gray-100 hover:border-transparent transition-all text-left"
           >
             <div className="w-12 h-12 bg-brand-100 rounded-2xl flex items-center justify-center mb-4">

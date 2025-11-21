@@ -1,0 +1,141 @@
+[
+  {
+    "state": "Distrito Capital",
+    "city": "Caracas",
+    "urbanizations": [
+      "Las Mercedes",
+      "Los Palos Grandes",
+      "Altamira",
+      "La Castellana",
+      "El Rosal",
+      "Los Naranjos",
+      "La Lagunita",
+      "Santa Paula",
+      "Macaracuay",
+      "Colinas de Bello Monte",
+      "Campo Alegre",
+      "Santa Fe Norte"
+    ]
+  },
+  {
+    "state": "Carabobo",
+    "city": "Valencia",
+    "urbanizations": [
+      "Prebo",
+      "El Viñedo",
+      "La Viña",
+      "La Trigaleña",
+      "Guataparo",
+      "Las Chimeneas",
+      "El Parral",
+      "Los Mangos",
+      "Agua Blanca",
+      "La Alegría",
+      "Trigal Centro"
+    ]
+  },
+  {
+    "state": "Zulia",
+    "city": "Maracaibo",
+    "urbanizations": [
+      "La Lago",
+      "Tierra Negra",
+      "El Milagro",
+      "5 de Julio",
+      "Cecilio Acosta",
+      "Santa Rita",
+      "Valle Frío",
+      "Virginia",
+      "La Paragua"
+    ]
+  },
+  {
+    "state": "Lara",
+    "city": "Barquisimeto",
+    "urbanizations": [
+      "Nueva Segovia",
+      "Los Leones",
+      "El Parral",
+      "Santa Elena",
+      "Colinas de Santa Rosa",
+      "Cabudare Norte",
+      "La Rosaleda",
+      "La Hacienda"
+    ]
+  },
+  {
+    "state": "Aragua",
+    "city": "Maracay",
+    "urbanizations": [
+      "Las Delicias",
+      "Base Aragua",
+      "Calicanto",
+      "San Jacinto",
+      "La Soledad",
+      "Los Chaguaramos",
+      "La Floresta"
+    ]
+  },
+  {
+    "state": "Bolívar",
+    "city": "Puerto Ordaz",
+    "urbanizations": [
+      "Las Garzas",
+      "Villa Granada",
+      "Alta Vista",
+      "Los Olivos",
+      "Urb. Los Alacranes",
+      "Los Mangos",
+      "Churum Merú"
+    ]
+  },
+  {
+    "state": "Mérida",
+    "city": "Mérida",
+    "urbanizations": [
+      "La Pedregosa",
+      "Santa Juana",
+      "El Llano",
+      "Los Sauzales",
+      "Campo de Oro",
+      "Alto Chama"
+    ]
+  },
+  {
+    "state": "Táchira",
+    "city": "San Cristóbal",
+    "urbanizations": [
+      "Barrio Obrero",
+      "Las Lomas",
+      "Santo Domingo",
+      "La Concordia",
+      "Santa Teresa",
+      "Pirineos",
+      "La Castellana"
+    ]
+  },
+  {
+    "state": "Anzoátegui",
+    "city": "Puerto La Cruz",
+    "urbanizations": [
+      "Lechería",
+      "Las Palmeras",
+      "El Morro",
+      "Colinas del Neverí",
+      "El Peñón",
+      "Los Cerezos"
+    ]
+  },
+  {
+    "state": "Nueva Esparta",
+    "city": "Porlamar",
+    "urbanizations": [
+      "Costa Azul",
+      "Los Robles",
+      "Playa El Ángel",
+      "Apostadero",
+      "Ciudad Marin",
+      "Pampatar Centro"
+    ]
+  }
+]

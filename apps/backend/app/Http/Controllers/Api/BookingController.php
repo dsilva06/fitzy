@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use App\Http\Requests\BookingStoreRequest;
 use App\Http\Requests\BookingUpdateRequest;
 use Illuminate\Support\Facades\DB;
+use App\Models\Status;
 
 class BookingController extends Controller
 {
@@ -30,18 +31,25 @@ class BookingController extends Controller
     public function store(BookingStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $statusValue = $data['status'] ?? 'pending';
+        $statusId = Status::idFor(Booking::class, $statusValue);
 
-        $booking = DB::transaction(function () use ($data) {
+        $booking = DB::transaction(function () use ($data, $statusValue, $statusId) {
             $booking = Booking::firstOrCreate(
                 [
                     'user_id' => $data['user_id'],
                     'session_id' => $data['session_id'],
                 ],
                 [
-                    'status' => $data['status'] ?? 'pending',
+                    'status' => $statusValue,
+                    'status_id' => $statusId,
                     'cancellation_deadline' => $data['cancellation_deadline'] ?? null,
                 ]
             );
+
+            if (! $booking->status_id && $statusId) {
+                $booking->forceFill(['status_id' => $statusId])->save();
+            }
 
             return $booking;
         });
@@ -57,8 +65,17 @@ class BookingController extends Controller
     public function update(BookingUpdateRequest $request, Booking $booking): JsonResponse
     {
         $data = $request->validated();
+        $statusId = null;
+
+        if (array_key_exists('status', $data)) {
+            $statusId = Status::idFor(Booking::class, $data['status']);
+        }
 
         $booking->fill($data)->save();
+
+        if ($statusId) {
+            $booking->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($booking->fresh(['session', 'session.venue', 'session.classType']));
     }

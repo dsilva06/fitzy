@@ -10,6 +10,7 @@ use App\Models\Favorite;
 use App\Models\Package;
 use App\Models\PackageOwnership;
 use App\Models\PaymentMethod;
+use App\Models\Status;
 use App\Models\Venue;
 use App\Models\WaitlistEntry;
 use App\Models\VenueInstructor;
@@ -40,6 +41,9 @@ class DemoContentSeeder extends Seeder
         $venuesData = [
             [
                 'name' => 'Pulse Fitness Studio',
+                'email' => 'pulse@fitzy.demo',
+                'phone' => '+58 424-000-0001',
+                'rif' => 'J-00000001-0',
                 'neighborhood' => 'Downtown',
                 'city' => 'Caracas',
                 'address' => '123 Main St',
@@ -49,6 +53,9 @@ class DemoContentSeeder extends Seeder
             ],
             [
                 'name' => 'Zen Yoga Loft',
+                'email' => 'zen@fitzy.demo',
+                'phone' => '+58 424-000-0002',
+                'rif' => 'J-00000002-0',
                 'neighborhood' => 'Altamira',
                 'city' => 'Caracas',
                 'address' => '456 Serenity Ave',
@@ -58,6 +65,9 @@ class DemoContentSeeder extends Seeder
             ],
             [
                 'name' => 'Ride Revolution',
+                'email' => 'ride@fitzy.demo',
+                'phone' => '+58 424-000-0003',
+                'rif' => 'J-00000003-0',
                 'neighborhood' => 'Las Mercedes',
                 'city' => 'Caracas',
                 'address' => '789 Velocity Rd',
@@ -65,15 +75,37 @@ class DemoContentSeeder extends Seeder
                 'logo_url' => null,
                 'description' => 'Immersive indoor cycling experience with live DJs.',
             ],
+            [
+                'name' => 'Parque Padel Courts',
+                'email' => 'parquepadel@fitzy.demo',
+                'phone' => '+58 424-000-0004',
+                'rif' => 'J-00000004-0',
+                'neighborhood' => 'La Castellana',
+                'city' => 'Caracas',
+                'address' => '101 Smash Blvd',
+                'rating' => 4.6,
+                'logo_url' => null,
+                'description' => 'Premium padel & tennis courts with locker rooms and cafe.',
+            ],
         ];
 
-        $venues = collect($venuesData)->mapWithKeys(function (array $data) use ($owner) {
+        $approvedVenueStatusId = Status::idFor(Venue::class, VenueStatus::Approved->value);
+
+        $venues = collect($venuesData)->mapWithKeys(function (array $data) use ($owner, $approvedVenueStatusId) {
+            $payload = collect($data)
+                ->except(['email', 'phone', 'rif'])
+                ->all();
+
             $venue = Venue::updateOrCreate(
                 ['name' => $data['name']],
-                array_merge($data, ['status' => VenueStatus::Approved->value])
+                array_merge($payload, ['status' => VenueStatus::Approved->value])
             );
 
             $venue->forceFill([
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'rif' => $data['rif'],
+                'status_id' => $approvedVenueStatusId,
                 'approved_at' => now(),
                 'approved_by' => $owner->id,
             ])->save();
@@ -102,6 +134,7 @@ class DemoContentSeeder extends Seeder
             ['name' => 'Yoga', 'description' => 'Mindful flows and breath work.'],
             ['name' => 'HIIT', 'description' => 'High intensity interval training.'],
             ['name' => 'Cycling', 'description' => 'Music-driven cycling sessions.'],
+            ['name' => 'Padel', 'description' => 'Doubles play on premium padel courts.'],
         ];
 
         $classTypes = collect($classTypesData)->mapWithKeys(function (array $data) {
@@ -253,6 +286,34 @@ class DemoContentSeeder extends Seeder
                 'credit_cost' => 3,
                 'level' => 'All Levels',
             ],
+            [
+                'name' => 'Padel Court A - Prime Slot',
+                'venue' => 'Parque Padel Courts',
+                'class_type' => 'Padel',
+                'start_offset' => 6,
+                'duration_minutes' => 90,
+                'coach_name' => 'Court Host',
+                'instructor' => null,
+                'capacity_total' => 4,
+                'capacity_taken' => 2,
+                'price' => 40,
+                'credit_cost' => 2,
+                'level' => 'All Levels',
+            ],
+            [
+                'name' => 'Evening Tennis Doubles',
+                'venue' => 'Parque Padel Courts',
+                'class_type' => 'Padel',
+                'start_offset' => 13,
+                'duration_minutes' => 90,
+                'coach_name' => 'Court Host',
+                'instructor' => null,
+                'capacity_total' => 4,
+                'capacity_taken' => 4,
+                'price' => 45,
+                'credit_cost' => 2,
+                'level' => 'Intermediate',
+            ],
         ];
 
         $sessions = collect($sessionsData)->map(function (array $data) use ($start, $venues, $classTypes, $instructors) {
@@ -281,55 +342,75 @@ class DemoContentSeeder extends Seeder
             );
         });
 
-        PackageOwnership::updateOrCreate(
-            [
-                'user_id' => $owner->id,
-                'package_id' => $packages['HIIT 10-Pack']->id,
-            ],
-            [
-                'credits_total' => 10,
-                'credits_remaining' => 6,
-                'status' => 'active',
-                'purchased_at' => Carbon::parse('2024-07-01 12:00:00', 'UTC'),
-                'expires_at' => Carbon::parse('2024-10-01 12:00:00', 'UTC'),
-            ]
-        );
+        $activePackageStatusId = Status::idFor(PackageOwnership::class, 'active');
 
-        PackageOwnership::updateOrCreate(
-            [
-                'user_id' => $owner->id,
-                'package_id' => $packages['Unlimited Yoga Month']->id,
-            ],
-            [
-                'credits_total' => 0,
-                'credits_remaining' => 0,
-                'status' => 'active',
-                'purchased_at' => Carbon::parse('2024-07-15 12:00:00', 'UTC'),
-                'expires_at' => Carbon::parse('2024-08-15 12:00:00', 'UTC'),
-            ]
-        );
+        tap(
+            PackageOwnership::updateOrCreate(
+                [
+                    'user_id' => $owner->id,
+                    'package_id' => $packages['HIIT 10-Pack']->id,
+                ],
+                [
+                    'credits_total' => 10,
+                    'credits_remaining' => 6,
+                    'status' => 'active',
+                    'purchased_at' => Carbon::parse('2024-07-01 12:00:00', 'UTC'),
+                    'expires_at' => Carbon::parse('2024-10-01 12:00:00', 'UTC'),
+                ]
+            )
+        )->forceFill([
+            'status_id' => $activePackageStatusId,
+        ])->save();
 
-        Booking::updateOrCreate(
-            [
-                'user_id' => $owner->id,
-                'session_id' => $sessions[0]->id,
-            ],
-            [
-                'status' => 'confirmed',
-                'cancellation_deadline' => Carbon::parse('2024-08-01 07:00:00', 'UTC'),
-            ]
-        );
+        tap(
+            PackageOwnership::updateOrCreate(
+                [
+                    'user_id' => $owner->id,
+                    'package_id' => $packages['Unlimited Yoga Month']->id,
+                ],
+                [
+                    'credits_total' => 0,
+                    'credits_remaining' => 0,
+                    'status' => 'active',
+                    'purchased_at' => Carbon::parse('2024-07-15 12:00:00', 'UTC'),
+                    'expires_at' => Carbon::parse('2024-08-15 12:00:00', 'UTC'),
+                ]
+            )
+        )->forceFill([
+            'status_id' => $activePackageStatusId,
+        ])->save();
 
-        Booking::updateOrCreate(
-            [
-                'user_id' => $owner->id,
-                'session_id' => $sessions[2]->id,
-            ],
-            [
-                'status' => 'confirmed',
-                'cancellation_deadline' => Carbon::parse('2024-08-01 10:00:00', 'UTC'),
-            ]
-        );
+        $confirmedBookingStatusId = Status::idFor(Booking::class, 'confirmed');
+
+        tap(
+            Booking::updateOrCreate(
+                [
+                    'user_id' => $owner->id,
+                    'session_id' => $sessions[0]->id,
+                ],
+                [
+                    'status' => 'confirmed',
+                    'cancellation_deadline' => Carbon::parse('2024-08-01 07:00:00', 'UTC'),
+                ]
+            )
+        )->forceFill([
+            'status_id' => $confirmedBookingStatusId,
+        ])->save();
+
+        tap(
+            Booking::updateOrCreate(
+                [
+                    'user_id' => $owner->id,
+                    'session_id' => $sessions[2]->id,
+                ],
+                [
+                    'status' => 'confirmed',
+                    'cancellation_deadline' => Carbon::parse('2024-08-01 10:00:00', 'UTC'),
+                ]
+            )
+        )->forceFill([
+            'status_id' => $confirmedBookingStatusId,
+        ])->save();
 
         Favorite::updateOrCreate([
             'user_id' => $owner->id,
@@ -341,15 +422,26 @@ class DemoContentSeeder extends Seeder
             'venue_id' => $venues['Ride Revolution']->id,
         ]);
 
-        WaitlistEntry::updateOrCreate(
-            [
-                'user_id' => $owner->id,
-                'session_id' => $sessions[4]->id,
-            ],
-            [
-                'status' => 'active',
-            ]
-        );
+        Favorite::updateOrCreate([
+            'user_id' => $owner->id,
+            'venue_id' => $venues['Parque Padel Courts']->id,
+        ]);
+
+        $activeWaitlistStatusId = Status::idFor(WaitlistEntry::class, 'active');
+
+        tap(
+            WaitlistEntry::updateOrCreate(
+                [
+                    'user_id' => $owner->id,
+                    'session_id' => $sessions[4]->id,
+                ],
+                [
+                    'status' => 'active',
+                ]
+            )
+        )->forceFill([
+            'status_id' => $activeWaitlistStatusId,
+        ])->save();
 
         PaymentMethod::updateOrCreate(
             [
@@ -376,4 +468,5 @@ class DemoContentSeeder extends Seeder
             ]
         );
     }
+
 }

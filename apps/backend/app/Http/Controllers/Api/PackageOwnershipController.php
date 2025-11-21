@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\PackageOwnershipStoreRequest;
 use App\Http\Requests\PackageOwnershipUpdateRequest;
+use App\Models\Status;
 
 class PackageOwnershipController extends Controller
 {
@@ -28,8 +29,17 @@ class PackageOwnershipController extends Controller
     public function store(PackageOwnershipStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $statusValue = $data['status'] ?? 'active';
+        $statusId = Status::idFor(PackageOwnership::class, $statusValue);
 
-        $ownership = PackageOwnership::create($data);
+        $ownership = PackageOwnership::create(array_merge($data, [
+            'status' => $statusValue,
+            'status_id' => $statusId,
+        ]));
+
+        if (! $ownership->status_id && $statusId) {
+            $ownership->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($ownership->fresh(['package', 'package.venue']), 201);
     }
@@ -42,12 +52,21 @@ class PackageOwnershipController extends Controller
     public function update(PackageOwnershipUpdateRequest $request, PackageOwnership $packageOwnership): JsonResponse
     {
         $data = $request->validated();
+        $statusId = null;
+
+        if (array_key_exists('status', $data)) {
+            $statusId = Status::idFor(PackageOwnership::class, $data['status']);
+        }
 
         if (array_key_exists('credits_remaining', $data)) {
             $data['credits_remaining'] = max(0, $data['credits_remaining']);
         }
 
         $packageOwnership->fill($data)->save();
+
+        if ($statusId) {
+            $packageOwnership->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($packageOwnership->fresh(['package', 'package.venue']));
     }

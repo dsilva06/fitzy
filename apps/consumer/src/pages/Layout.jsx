@@ -14,10 +14,15 @@ export default function Layout({ children, currentPageName }) {
   const { user, logout } = useAuth();
 
   const navItems = [
-    { name: "Home", path: createPageUrl("Home"), icon: Home },
-    { name: "Explore", path: createPageUrl("Explore"), icon: Compass },
-    { name: "Calendar", path: createPageUrl("Calendar"), icon: Calendar },
-    { name: "Packages", path: createPageUrl("Packages"), icon: Package },
+    { name: "Home", path: createPageUrl("Home"), icon: Home, matches: ["Home"] },
+    {
+      name: "Explore",
+      path: createPageUrl("ExploreClasses"),
+      icon: Compass,
+      matches: ["Explore", "ExploreClasses", "ExploreCourts", "CategoryResults", "CourtCategoryResults", "VenueDetails", "VenueSchedule", "CourtDetails", "CourtSchedule", "ClassDetails"],
+    },
+    { name: "Calendar", path: createPageUrl("Calendar"), icon: Calendar, matches: ["Calendar"] },
+    { name: "Packages", path: createPageUrl("Packages"), icon: Package, matches: ["Packages"] },
   ];
 
   const drawerItems = [
@@ -37,7 +42,7 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 
-  const mainNavPages = ["Home", "Explore", "Calendar", "Packages"];
+  const mainNavPages = navItems.flatMap((item) => item.matches ?? [item.name]);
   const isMainPage = mainNavPages.includes(currentPageName);
   
   const handleDrawerNavigate = (path) => {
@@ -166,20 +171,19 @@ export default function Layout({ children, currentPageName }) {
       {isMainPage && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-gray-100 z-30">
           <div className="max-w-md mx-auto flex items-center justify-around px-2 h-20 safe-area-bottom">
-            {navItems.map((item, index) => {
-              const isActive = location.pathname === item.path;
+            {navItems.map((item) => {
+              const matchNames = item.matches ?? [item.name];
+              const isActive = matchNames.includes(currentPageName);
               return (
                 <button
                   key={item.name}
                   onClick={() => navigate(item.path)}
                   className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[70px] transition-colors rounded-lg"
                 >
-                  <item.icon 
-                    className={`w-6 h-6 transition-colors ${
-                      isActive ? "text-brand-600" : "text-gray-400"
-                    }`}
+                  <item.icon
+                    className={`w-6 h-6 transition-colors ${isActive ? "text-brand-600" : "text-gray-400"}`}
                   />
-                  <span 
+                  <span
                     className={`text-xs font-semibold transition-colors ${
                       isActive ? "text-brand-600" : "text-gray-500"
                     }`}

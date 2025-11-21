@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\Package;
+use App\Models\Status;
 
 class PackageOwnership extends Model
 {
@@ -17,6 +18,7 @@ class PackageOwnership extends Model
         'credits_total',
         'credits_remaining',
         'status',
+        'status_id',
         'purchased_at',
         'expires_at',
     ];
@@ -36,5 +38,10 @@ class PackageOwnership extends Model
     public function package()
     {
         return $this->belongsTo(Package::class);
+    }
+
+    public function statusDefinition()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
     }
 }

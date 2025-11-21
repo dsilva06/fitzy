@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { getLocalToday } from "@/utils";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { getLocalToday, fromCategorySlug, toCategorySlug, isCourtVenue } from "@/utils";
 import { useQuery } from "@tanstack/react-query";
 import { fitzy } from "@/api/fitzyClient";
 import { format, isSameDay } from "date-fns";
@@ -12,8 +12,11 @@ import CheckoutSheet from "../components/checkout/CheckoutSheet";
 
 export default function CategorySchedulePage() {
   const navigate = useNavigate();
-  const urlParams = new URLSearchParams(window.location.search);
-  const categoryName = urlParams.get('category');
+  const { categorySlug = "" } = useParams();
+  const location = useLocation();
+  const legacyCategory = new URLSearchParams(location.search).get("category");
+  const effectiveSlug = categorySlug || (legacyCategory ? toCategorySlug(legacyCategory) : "");
+  const categoryName = legacyCategory || fromCategorySlug(effectiveSlug) || "Classes";
 
   const [activeTab, setActiveTab] = useState("classes");
   const [selectedDate, setSelectedDate] = useState(() => getLocalToday());
@@ -25,19 +28,57 @@ export default function CategorySchedulePage() {
   const { data: allSessions = [] } = useQuery({ queryKey: ['allSessions'], queryFn: () => fitzy.entities.Session.list() });
   const { data: allPackages = [] } = useQuery({ queryKey: ['packages'], queryFn: () => fitzy.entities.Package.list() });
   
-  const classType = useMemo(() => classTypes.find(c => c.name === categoryName), [classTypes, categoryName]);
+  const classType = useMemo(
+    () => classTypes.find((c) => toCategorySlug(c.name) === effectiveSlug.toLowerCase()),
+    [classTypes, effectiveSlug]
+  );
+
+  const matchingVenueIds = useMemo(() => {
+    return new Set(
+      venues
+        .filter(
+          (venue) =>
+            Array.isArray(venue.categories) &&
+            venue.categories.some((category) => toCategorySlug(category) === effectiveSlug.toLowerCase())
+        )
+        .map((venue) => String(venue.id))
+    );
+  }, [venues, effectiveSlug]);
 
   const filteredSessions = useMemo(() => {
-    if (!classType) return [];
     return allSessions
-      .filter(s => s.class_type_id === classType.id && isSameDay(new Date(s.start_datetime), selectedDate))
+      .filter((s) => {
+        if (!isSameDay(new Date(s.start_datetime), selectedDate)) {
+          return false;
+        }
+        if (classType) {
+          return s.class_type_id === classType.id;
+        }
+        return matchingVenueIds.has(String(s.venue_id));
+      })
+      .filter((s) => {
+        const hostVenue = venues.find((v) => String(v.id) === String(s.venue_id));
+        return hostVenue ? !isCourtVenue(hostVenue) : false;
+      })
       .sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime));
-  }, [classType, allSessions, selectedDate]);
+  }, [classType, allSessions, selectedDate, venues, matchingVenueIds]);
   
   const filteredPackages = useMemo(() => {
-    if (!classType) return [];
-    return allPackages.filter(p => p.category_name === categoryName || !p.category_name);
-  }, [classType, allPackages]);
+    if (classType) {
+      return allPackages.filter(
+        (p) =>
+          p.category_name === categoryName ||
+          (!p.category_name && !p.venue_id)
+      );
+    }
+
+    return allPackages.filter((p) => {
+      if (p.category_name) {
+        return toCategorySlug(p.category_name) === effectiveSlug.toLowerCase();
+      }
+      return matchingVenueIds.has(String(p.venue_id));
+    });
+  }, [classType, allPackages, categoryName, matchingVenueIds, effectiveSlug]);
 
   const handleBookSession = (session) => {
     setSelectedItem(session);
@@ -49,8 +90,19 @@ export default function CategorySchedulePage() {
   };
 
   const selectedSessionVenue = selectedItem && activeTab === 'classes'
-    ? venues.find(v => v.id === selectedItem.venue_id)
+    ? venues.find((v) => String(v.id) === String(selectedItem.venue_id))
     : null;
+
+  if (!classType && matchingVenueIds.size === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-2">
+          <p className="text-2xl font-semibold text-gray-900">Category not found</p>
+          <p className="text-gray-500">Please select another class category.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-20 pb-8 bg-gray-50">

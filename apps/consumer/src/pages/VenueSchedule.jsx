@@ -1,37 +1,41 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Clock, User as UserIcon } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import DateStrip from "../components/shared/DateStrip";
 import CheckoutSheet from "../components/checkout/CheckoutSheet";
+import { isCourtVenue } from "@/utils";
+import { motion } from "framer-motion";
 
 export default function VenueSchedulePage() {
   const navigate = useNavigate();
-  const urlParams = new URLSearchParams(window.location.search);
-  const venueId = urlParams.get('venueId');
+  const { venueId: paramVenueId } = useParams();
+  const location = useLocation();
+  const legacyId = new URLSearchParams(location.search).get("venueId");
+  const venueId = paramVenueId ?? legacyId;
 
   const [activeTab, setActiveTab] = useState("classes");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSession, setSelectedSession] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [bookedSessionIds, setBookedSessionIds] = useState([]);
 
   const { data: venue } = useQuery({
     queryKey: ['venue', venueId],
     queryFn: async () => {
-      const venues = await fitzy.entities.Venue.list();
-      return venues.find(v => v.id === venueId);
+      if (!venueId) return null;
+      return fitzy.entities.Venue.show(venueId);
     },
   });
 
-  const { data: sessions } = useQuery({
+  const { data: sessions = [] } = useQuery({
     queryKey: ['sessions', venueId, selectedDate],
     queryFn: async () => {
       const allSessions = await fitzy.entities.Session.filter({ venue_id: venueId }, "start_datetime");
       return allSessions.filter(s => isSameDay(new Date(s.start_datetime), selectedDate));
     },
-    initialData: [],
   });
 
   const { data: classTypes } = useQuery({
@@ -47,25 +51,52 @@ export default function VenueSchedulePage() {
   });
 
   if (!venue) {
-    return <div className="min-h-screen pt-20 px-4">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        Loading venue...
+      </div>
+    );
   }
 
-  const handleBookSession = (session) => {
-    setSelectedSession(session);
-    setShowCheckout(true);
-  };
+  if (isCourtVenue(venue)) {
+    navigate(`/courts/${venueId}`, { replace: true });
+    return null;
+  }
 
-  const selectedSessionClassType = selectedSession
-    ? classTypes.find(c => c.id === selectedSession.class_type_id)
-    : null;
+  const sessionsForSelectedDate = useMemo(() => {
+    return [...sessions]
+      .filter((session) =>
+        isSameDay(new Date(session.start_datetime), selectedDate)
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.start_datetime).getTime() -
+          new Date(b.start_datetime).getTime()
+      );
+  }, [sessions, selectedDate]);
+
+  useEffect(() => {
+    if (!sessions.length) return;
+    const hasSessionsForSelected = sessions.some((session) =>
+      isSameDay(new Date(session.start_datetime), selectedDate)
+    );
+    if (!hasSessionsForSelected) {
+      const nextSession = [...sessions].sort(
+        (a, b) => new Date(a.start_datetime) - new Date(b.start_datetime)
+      )[0];
+      if (nextSession) {
+        setSelectedDate(new Date(nextSession.start_datetime));
+      }
+    }
+  }, [sessions, selectedDate]);
 
   return (
-    <div className="min-h-screen pt-20 pb-8">
+    <div className="min-h-screen bg-slate-50 pt-24 pb-12">
       {/* Header */}
-      <div className="px-4 mb-6">
+      <div className="px-5 mb-10 space-y-4">
         <button
           onClick={() => navigate(-1)}
-          className="mb-4 p-2 hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors inline-flex"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
@@ -82,97 +113,122 @@ export default function VenueSchedulePage() {
               {venue.name[0]}
             </div>
           )}
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{venue.name}</h1>
-            <div className="flex items-center gap-2 text-gray-600 mt-1">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold text-gray-900">{venue.name}</h1>
+            <div className="flex items-center gap-2 text-gray-600">
               <MapPin className="w-4 h-4" />
               <span>{venue.neighborhood}, {venue.city}</span>
             </div>
+            <button
+              onClick={() => navigate(`/venues/${venueId}`)}
+              className="text-sm font-semibold text-brand-600 inline-flex items-center gap-1"
+            >
+              View details
+            </button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 px-4">
-        <button
-          onClick={() => setActiveTab("classes")}
-          className={`flex-1 py-3 rounded-2xl font-semibold transition-colors ${
-            activeTab === "classes"
-              ? "bg-brand-600 text-white"
-              : "bg-white text-gray-600"
-          }`}
-        >
-          Classes
-        </button>
-        <button
-          onClick={() => setActiveTab("packages")}
-          className={`flex-1 py-3 rounded-2xl font-semibold transition-colors ${
-            activeTab === "packages"
-              ? "bg-brand-600 text-white"
-              : "bg-white text-gray-600"
-          }`}
-        >
-          Packages
-        </button>
+      <div className="px-5 mb-6">
+        <div className="flex border-b border-gray-200">
+          {["classes", "packages"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 pb-3 text-base font-semibold relative transition-colors ${
+                activeTab === tab ? "text-brand-600" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab === "classes" ? "Classes" : "Packages"}
+              {activeTab === tab && (
+                <motion.span
+                  layoutId="venueScheduleTabUnderline"
+                  className="absolute inset-x-0 -bottom-0.5 h-1 rounded-full bg-brand-600"
+                />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === "classes" ? (
         <>
           <DateStrip selectedDate={selectedDate} onDateSelect={setSelectedDate} />
-          
-          <div className="px-4 mt-6 space-y-3">
-            {sessions.map((session) => {
-              const classType = classTypes.find(c => c.id === session.class_type_id);
+
+          <div className="px-5 mt-6 space-y-5">
+            <div className="px-1 text-sm text-gray-500">
+              {format(selectedDate, "EEEE, MMM d")}
+            </div>
+            {sessionsForSelectedDate.map((session) => {
+              const classType = classTypes.find((c) => c.id === session.class_type_id);
               const capacityLeft = session.capacity_total - session.capacity_taken;
               const isFull = capacityLeft <= 0;
+              const startDate = new Date(session.start_datetime);
 
               return (
-                <div key={session.id} className="bg-white rounded-2xl p-4 shadow-md">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-900">
-                        {classType?.name || "Class"}
-                      </h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-2">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{format(new Date(session.start_datetime), "h:mm a")}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <UserIcon className="w-4 h-4" />
-                          <span>{session.coach_name}</span>
-                        </div>
-                      </div>
+                <div
+                  key={session.id}
+                  onClick={() => navigate(`/classes/${session.id}?venueId=${venueId}`)}
+                  className="bg-white rounded-3xl px-5 py-4 shadow-sm border border-white grid grid-cols-[90px_minmax(0,1fr)_auto] items-center gap-4 w-full text-left hover:shadow-md transition-shadow cursor-pointer"
+                >
+                  <div className="text-left space-y-1">
+                    <div className="text-lg font-semibold text-gray-900">
+                      {format(startDate, "h:mm a")}
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-gray-900">${session.price}</p>
-                      <p className="text-sm text-gray-600">{session.credit_cost} credits</p>
+                    <div className="text-xs uppercase tracking-wide text-gray-500">
+                      {session.duration_minutes || 60} min
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm font-medium ${
-                      isFull ? "text-red-600" : capacityLeft <= 3 ? "text-orange-600" : "text-green-600"
-                    }`}>
-                      {isFull ? "Full" : `${capacityLeft} spots left`}
-                    </span>
+                  <div className="space-y-1">
+                    <div className="text-sm text-gray-500 uppercase tracking-wider">
+                      {classType?.name || "Class"}
+                    </div>
+                    <div className="text-lg font-semibold text-gray-900 line-clamp-2">
+                      {session.name}
+                    </div>
+                    <div className="text-sm text-gray-600 flex items-center gap-2">
+                      <UserIcon className="w-4 h-4" />
+                      <span>{session.coach_name || session.instructor?.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right space-y-2">
+                    <div className="text-xl font-semibold text-gray-900">${session.price}</div>
+                    <div className="text-xs text-gray-500">{session.credit_cost} credits</div>
                     <button
-                      onClick={() => handleBookSession(session)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isFull) {
+                          setSelectedSession(session);
+                          setShowCheckout(true);
+                        }
+                      }}
                       disabled={isFull}
-                      className={`px-6 py-2 rounded-xl font-semibold transition-colors ${
-                        isFull
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-brand-600 text-white hover:bg-brand-700"
+                      className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                        isFull ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-brand-600 text-white hover:bg-brand-700"
                       }`}
                     >
-                      {isFull ? "Join Waitlist" : "Book"}
+                      Quick book
                     </button>
+                    <div
+                      className={`text-xs font-medium ${
+                        isFull
+                          ? "text-red-600"
+                          : capacityLeft <= 3
+                            ? "text-orange-600"
+                            : "text-green-600"
+                      }`}
+                    >
+                      {isFull ? "Class full" : `${capacityLeft} spots left`}
+                    </div>
                   </div>
                 </div>
               );
             })}
 
-            {sessions.length === 0 && (
+            {sessionsForSelectedDate.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 No classes available for this date
               </div>
@@ -180,7 +236,7 @@ export default function VenueSchedulePage() {
           </div>
         </>
       ) : (
-        <div className="px-4 space-y-4">
+        <div className="px-5 space-y-4">
           {packages.map((pkg) => (
             <div key={pkg.id} className="bg-white rounded-2xl p-6 shadow-md">
               <h3 className="font-bold text-xl text-gray-900 mb-2">{pkg.name}</h3>
@@ -202,17 +258,19 @@ export default function VenueSchedulePage() {
         </div>
       )}
 
-      {/* Checkout Sheet */}
-      {showCheckout && selectedSession && (
+      {showCheckout && selectedSession && venue && (
         <CheckoutSheet
           session={selectedSession}
           venue={venue}
-          classType={selectedSessionClassType}
+          classType={classTypes.find((c) => c.id === selectedSession.class_type_id)}
           onClose={() => {
             setShowCheckout(false);
             setSelectedSession(null);
           }}
           onSuccess={() => {
+            setBookedSessionIds((prev) =>
+              prev.includes(selectedSession.id) ? prev : [...prev, selectedSession.id]
+            );
             setShowCheckout(false);
             setSelectedSession(null);
           }}

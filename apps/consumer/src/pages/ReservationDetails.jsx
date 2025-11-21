@@ -1,38 +1,40 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fitzy } from "@/api/fitzyClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Clock, User as UserIcon, Calendar as CalendarIcon, CreditCard } from "lucide-react";
-import { format, isBefore, addHours } from "date-fns";
+import { format, isBefore } from "date-fns";
 
 export default function ReservationDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const urlParams = new URLSearchParams(window.location.search);
-  const bookingId = urlParams.get('bookingId');
+  const { bookingId: routeBookingId } = useParams();
+  const [searchParams] = useSearchParams();
+  const bookingId = routeBookingId ?? searchParams.get('bookingId');
 
-  const { data: booking } = useQuery({
+  const { data: booking, isLoading: bookingLoading } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: async () => {
       const bookings = await fitzy.entities.Booking.list();
-      return bookings.find(b => b.id === bookingId);
+      return bookings.find(b => String(b.id) === String(bookingId));
     },
+    enabled: !!bookingId,
   });
 
-  const { data: session } = useQuery({
+  const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['session', booking?.session_id],
     queryFn: async () => {
       const sessions = await fitzy.entities.Session.list();
-      return sessions.find(s => s.id === booking.session_id);
+      return sessions.find(s => String(s.id) === String(booking.session_id));
     },
     enabled: !!booking,
   });
 
-  const { data: venue } = useQuery({
+  const { data: venue, isLoading: venueLoading } = useQuery({
     queryKey: ['venue', session?.venue_id],
     queryFn: async () => {
       const venues = await fitzy.entities.Venue.list();
-      return venues.find(v => v.id === session.venue_id);
+      return venues.find(v => String(v.id) === String(session.venue_id));
     },
     enabled: !!session,
   });
@@ -41,7 +43,7 @@ export default function ReservationDetailsPage() {
     queryKey: ['classType', session?.class_type_id],
     queryFn: async () => {
       const classTypes = await fitzy.entities.ClassType.list();
-      return classTypes.find(c => c.id === session.class_type_id);
+      return classTypes.find(c => String(c.id) === String(session.class_type_id));
     },
     enabled: !!session,
   });
@@ -60,8 +62,42 @@ export default function ReservationDetailsPage() {
     },
   });
 
-  if (!booking || !session || !venue) {
+  if (!bookingId) {
+    return (
+      <div className="min-h-screen pt-20 px-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 p-2 hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Missing reservation</h1>
+          <p className="text-gray-600">We could not open this reservation because no booking ID was provided.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (bookingLoading || sessionLoading || venueLoading) {
     return <div className="min-h-screen pt-20 px-4">Loading...</div>;
+  }
+
+  if (!booking || !session || !venue) {
+    return (
+      <div className="min-h-screen pt-20 px-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 p-2 hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Reservation not found</h1>
+          <p className="text-gray-600">It looks like this booking no longer exists. Please try again from your calendar.</p>
+        </div>
+      </div>
+    );
   }
 
   const canCancel = booking.status === "confirmed" && 

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class VenueUpdateRequest extends FormRequest
 {
@@ -21,8 +22,15 @@ class VenueUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $venue = $this->route('venue');
+        $venueId = is_object($venue) ? $venue->id : $venue;
+
         return [
             'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'email', 'max:255', Rule::unique('venues', 'email')->ignore($venueId)],
+            'phone' => ['sometimes', 'string', 'max:20'],
+            'rif' => ['sometimes', 'string', 'max:50', Rule::unique('venues', 'rif')->ignore($venueId)],
+            'status' => ['sometimes', 'in:pending,approved,rejected'],
             'neighborhood' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],

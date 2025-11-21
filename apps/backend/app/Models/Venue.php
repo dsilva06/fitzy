@@ -8,6 +8,7 @@ use App\Enums\VenueStatus;
 use App\Models\ClassSession;
 use App\Models\Package;
 use App\Models\Favorite;
+use App\Models\Status;
 use App\Models\User;
 
 class Venue extends Model
@@ -16,6 +17,9 @@ class Venue extends Model
 
     protected $fillable = [
         'name',
+        'email',
+        'phone',
+        'rif',
         'neighborhood',
         'city',
         'address',
@@ -23,6 +27,7 @@ class Venue extends Model
         'logo_url',
         'description',
         'status',
+        'status_id',
         'status_note',
         'approved_at',
         'approved_by',
@@ -60,5 +65,10 @@ class Venue extends Model
     public function venueAdmins()
     {
         return $this->hasMany(User::class)->where('role', 'venue_admin');
+    }
+
+    public function statusDefinition()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
     }
 }

@@ -49,9 +49,22 @@ export default function AuthProvider({ children }) {
     return u;
   };
 
-  const register = async (payload) => {
-    const result = await fitzy.auth.register(payload);
-    if (!result || result.pending || !result.user) {
+  const register = async (payload = {}) => {
+    const role = payload.role ?? 'consumer';
+    const result = await fitzy.auth.register({
+      ...payload,
+      role,
+    });
+
+    if (!result || !result.user) {
+      const message =
+        result?.message ?? 'No se pudo crear la cuenta. Intenta de nuevo.';
+      const error = new Error(message);
+      error.response = { data: { message } };
+      throw error;
+    }
+
+    if (result.pending && role === 'venue_admin') {
       const message =
         result?.message ??
         'Tu cuenta necesita aprobación antes de poder ingresar.';

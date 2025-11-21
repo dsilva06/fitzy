@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\WaitlistEntryStoreRequest;
 use App\Http\Requests\WaitlistEntryUpdateRequest;
+use App\Models\Status;
 
 class WaitlistEntryController extends Controller
 {
@@ -28,6 +29,8 @@ class WaitlistEntryController extends Controller
     public function store(WaitlistEntryStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $statusValue = $data['status'] ?? 'active';
+        $statusId = Status::idFor(WaitlistEntry::class, $statusValue);
 
         $entry = WaitlistEntry::firstOrCreate(
             [
@@ -35,9 +38,14 @@ class WaitlistEntryController extends Controller
                 'session_id' => $data['session_id'],
             ],
             [
-                'status' => $data['status'] ?? 'active',
+                'status' => $statusValue,
+                'status_id' => $statusId,
             ]
         );
+
+        if (! $entry->status_id && $statusId) {
+            $entry->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($entry->fresh(['session', 'session.venue']), $entry->wasRecentlyCreated ? 201 : 200);
     }
@@ -45,8 +53,17 @@ class WaitlistEntryController extends Controller
     public function update(WaitlistEntryUpdateRequest $request, WaitlistEntry $waitlistEntry): JsonResponse
     {
         $data = $request->validated();
+        $statusId = null;
+
+        if (array_key_exists('status', $data)) {
+            $statusId = Status::idFor(WaitlistEntry::class, $data['status']);
+        }
 
         $waitlistEntry->fill($data)->save();
+
+        if ($statusId) {
+            $waitlistEntry->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($waitlistEntry->fresh(['session', 'session.venue']));
     }

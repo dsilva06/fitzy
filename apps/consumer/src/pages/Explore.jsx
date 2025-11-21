@@ -1,8 +1,10 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Search, ChevronRight, Sunrise, Accessibility, Target, Bike, Move, Zap, Award, Trophy, Medal } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { fitzy } from "@/api/fitzyClient";
+import { createPageUrl, isCourtVenue, toCategorySlug } from "@/utils";
+import { Search, ChevronRight, Sunrise, Accessibility, Target, Bike, Move, Zap, Award, Trophy, Medal, Dumbbell } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const CategoryTile = ({ category, onSelect }) => (
@@ -26,26 +28,77 @@ const CategoryTile = ({ category, onSelect }) => (
 export default function ExplorePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const urlParams = new URLSearchParams(location.search);
-  const initialTab = urlParams.get('tab') || 'classes';
-  
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const isCourtsRoute = location.pathname.startsWith('/explore/courts');
+  const activeTab = isCourtsRoute ? 'courts' : 'classes';
   const [searchQuery, setSearchQuery] = useState("");
 
-  const classCategories = [
-    { name: 'Yoga', icon: Sunrise },
-    { name: 'Pilates', icon: Accessibility },
-    { name: 'Boxing', icon: Target },
-    { name: 'Cycling', icon: Bike },
-    { name: 'Barre', icon: Move },
-    { name: 'HIIT', icon: Zap },
-  ];
+  useEffect(() => {
+    if (location.pathname === '/explore') {
+      const params = new URLSearchParams(location.search);
+      const tabParam = params.get('tab');
+      const nextTab = tabParam === 'courts' ? 'courts' : 'classes';
+      navigate(`/explore/${nextTab}`, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
 
-  const courtCategories = [
-    { name: 'Tennis', icon: Trophy },
-    { name: 'Padel', icon: Award },
-    { name: 'Pickleball', icon: Medal },
-  ];
+  const { data: venues = [], isLoading: loadingVenues } = useQuery({
+    queryKey: ['explore-venues'],
+    queryFn: () => fitzy.entities.Venue.list(),
+  });
+
+  const matchingVenues = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const normalized = searchQuery.trim().toLowerCase();
+    const poolVenues = venues.filter((venue) =>
+      activeTab === 'courts' ? isCourtVenue(venue) : !isCourtVenue(venue)
+    );
+    return poolVenues.filter((venue) => {
+      const pool = [
+        venue.name,
+        venue.neighborhood,
+        venue.city,
+      ]
+        .filter(Boolean)
+        .map((value) => value.toLowerCase());
+      return pool.some((value) => value.includes(normalized));
+    });
+  }, [venues, searchQuery, activeTab]);
+
+const COURT_SPORTS = ["Tennis", "Padel", "Pickleball"];
+const courtIconMap = {
+  tennis: Trophy,
+  padel: Award,
+  pickleball: Medal,
+};
+
+  const classCategories = useMemo(() => {
+    const set = new Set(
+      venues.flatMap((venue) => venue.categories ?? [])
+    );
+    if (set.size === 0) {
+      ["Yoga", "Pilates", "HIIT", "Cycling"].forEach((fallback) => set.add(fallback));
+    }
+    return Array.from(set)
+      .sort()
+      .map((name) => {
+        const key = toCategorySlug(name);
+        const iconMap = {
+          yoga: Sunrise,
+          pilates: Accessibility,
+          boxing: Target,
+          cycling: Bike,
+          barre: Move,
+          hiit: Zap,
+        };
+        const Icon = iconMap[key] || Dumbbell;
+        return { name, icon: Icon };
+      });
+  }, [venues]);
+
+  const courtCategories = COURT_SPORTS.map((sport) => {
+    const Icon = courtIconMap[toCategorySlug(sport)] || Dumbbell;
+    return { name: sport, icon: Icon };
+  });
 
   const tabs = [
     { id: 'classes', label: 'Classes' },
@@ -53,14 +106,29 @@ export default function ExplorePage() {
   ];
 
   const handleCategorySelect = (category) => {
-    const isCourtCategory = courtCategories.some(c => c.name === category.name);
-    const fromTab = isCourtCategory ? 'courts' : 'classes';
-    navigate(createPageUrl("CategoryResults") + `?category=${encodeURIComponent(category.name)}&fromTab=${fromTab}`);
+    const slug = toCategorySlug(category.name);
+    if (activeTab === 'courts') {
+      navigate(`${createPageUrl("ExploreCourts")}/${slug}`);
+    } else {
+      navigate(`${createPageUrl("ExploreClasses")}/${slug}`);
+    }
+  };
+
+  const handleVenueSelect = (venueId) => {
+    const venue = venues.find((v) => String(v.id) === String(venueId));
+    const destination =
+      activeTab === 'courts' || (venue && isCourtVenue(venue))
+        ? `/complexes/${venueId}`
+        : `/venues/${venueId}`;
+    navigate(destination);
   };
 
   const handleTabClick = (tabId) => {
-    setActiveTab(tabId);
-    navigate(createPageUrl("Explore") + `?tab=${tabId}`, { replace: true });
+    if (tabId === 'courts') {
+      navigate(createPageUrl("ExploreCourts"));
+    } else {
+      navigate(createPageUrl("ExploreClasses"));
+    }
   }
 
   return (
@@ -70,15 +138,42 @@ export default function ExplorePage() {
         <h1 className="text-4xl font-bold text-gray-900 mb-6">Explore</h1>
         
         {/* Search */}
-        <div className="relative mb-8">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search venue or neighborhood..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-14 pr-5 py-4 bg-white rounded-2xl border-2 border-gray-200/80 focus:border-brand-500 focus:outline-none transition-colors text-base"
-          />
+        <div className="mb-8">
+          <div className="relative">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search venue or neighborhood..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-14 pr-5 py-4 bg-white rounded-2xl border-2 border-gray-200/80 focus:border-brand-500 focus:outline-none transition-colors text-base"
+            />
+          </div>
+          {searchQuery.trim().length > 0 && (
+            <div className="mt-3 rounded-2xl border border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm max-h-72 overflow-y-auto divide-y divide-gray-100">
+              {loadingVenues ? (
+                <div className="p-4 text-sm text-gray-500">Searching venues...</div>
+              ) : matchingVenues.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500">No venues found</div>
+              ) : (
+                matchingVenues.map((venue) => (
+                  <button
+                    key={venue.id}
+                    type="button"
+                    onClick={() => handleVenueSelect(venue.id)}
+                    className="w-full flex flex-col gap-1 px-4 py-3 text-left hover:bg-gray-50"
+                  >
+                    <span className="font-semibold text-gray-900 text-base leading-tight">
+                      {venue.name}
+                    </span>
+                    <span className="text-sm text-gray-500 leading-tight">
+                      {[venue.neighborhood, venue.city].filter(Boolean).join(', ')}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 

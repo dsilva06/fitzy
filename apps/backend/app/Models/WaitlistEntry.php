@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\ClassSession;
+use App\Models\Status;
 
 class WaitlistEntry extends Model
 {
@@ -15,6 +16,7 @@ class WaitlistEntry extends Model
         'user_id',
         'session_id',
         'status',
+        'status_id',
     ];
 
     public function user()
@@ -25,5 +27,10 @@ class WaitlistEntry extends Model
     public function session()
     {
         return $this->belongsTo(ClassSession::class, 'session_id');
+    }
+
+    public function statusDefinition()
+    {
+        return $this->belongsTo(Status::class, 'status_id');
     }
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { fitzy } from './api/fitzyClient';
+import venezuelaLocations from './data/venezuelaLocations.json';
+import urbanizationsByCity from './data/urbanizationsByCity.json';
 
 const FALLBACK_USER = {
   id: 'demo-user',
@@ -157,6 +159,177 @@ function addMonths(date, amount) {
 }
 
 const DAY_KEY_BY_INDEX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function slugifyLocation(input) {
+  return String(input ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function normalizeLocationKey(stateName, cityName) {
+  return slugifyLocation(`${stateName ?? ''}-${cityName ?? ''}`);
+}
+
+function buildUrbanizationLookup(data) {
+  if (!Array.isArray(data)) return {};
+
+  return data.reduce((acc, entry) => {
+    const state = entry?.state?.trim();
+    const city = entry?.city?.trim();
+    const key = normalizeLocationKey(state, city);
+    const items = Array.isArray(entry?.urbanizations) ? entry.urbanizations : [];
+    const uniqueUrbanizations = Array.from(
+      new Set(
+        items
+          .map((name) => (name ?? '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (key && uniqueUrbanizations.length > 0) {
+      acc[key] = uniqueUrbanizations;
+    }
+
+    return acc;
+  }, {});
+}
+
+function splitFullName(input) {
+  const normalized = String(input ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  if (!normalized) {
+    return { firstName: '', lastName: '' };
+  }
+
+  const parts = normalized.split(' ');
+
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts.slice(-1).join(' '),
+  };
+}
+
+function buildLocationOptions(data) {
+  if (!Array.isArray(data)) {
+    return {
+      states: [],
+      stateLookup: {},
+      cityLookup: {},
+      citiesByState: {},
+    };
+  }
+
+  const states = [];
+  const stateLookup = {};
+  const cityLookup = {};
+  const citiesByState = {};
+
+  data.forEach((state, stateIndex) => {
+    const stateName = state?.estado?.trim();
+    if (!stateName) return;
+
+    const stateSlug = slugifyLocation(
+      `${stateName}-${state?.id_estado ?? stateIndex}`
+    );
+
+    const stateOption = {
+      value: stateSlug,
+      label: stateName,
+      code: state?.iso_31662 ?? null,
+      capital: state?.capital?.trim() ?? '',
+    };
+
+    states.push(stateOption);
+    stateLookup[stateSlug] = {
+      ...stateOption,
+      municipios: Array.isArray(state?.municipios) ? state.municipios : [],
+    };
+
+    const municipios = stateLookup[stateSlug].municipios;
+
+    municipios.forEach((municipio, municipioIndex) => {
+      const municipalityName = municipio?.municipio?.trim();
+      const capitalName = (municipio?.capital ?? municipalityName ?? '').trim();
+
+      if (!capitalName) return;
+
+      const citySlug = slugifyLocation(
+        `${stateSlug}-${municipalityName ?? capitalName}-${municipioIndex}`
+      );
+
+      const uniqueZones = Array.from(
+        new Set(
+          (municipio?.parroquias ?? [])
+            .map((name) => (name ?? '').trim())
+            .filter(Boolean)
+        )
+      );
+
+      const cityKey = normalizeLocationKey(stateName, capitalName);
+      const customUrbanizations = URBANIZATION_LOOKUP[cityKey] ?? null;
+      const zones =
+        customUrbanizations?.length > 0
+          ? customUrbanizations
+          : uniqueZones.length > 0
+            ? uniqueZones
+            : [capitalName];
+
+      const cityOption = {
+        value: citySlug,
+        label: `${capitalName} (${stateName})`,
+        city: capitalName,
+        municipality: municipalityName ?? capitalName,
+        state: stateName,
+        stateValue: stateSlug,
+        zones,
+        hasUrbanizationOverrides: Boolean(customUrbanizations?.length),
+      };
+
+      cityLookup[citySlug] = cityOption;
+
+      if (!citiesByState[stateSlug]) {
+        citiesByState[stateSlug] = [];
+      }
+
+      citiesByState[stateSlug].push(cityOption);
+    });
+  });
+
+  states.sort((a, b) =>
+    a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
+  );
+
+  Object.values(citiesByState).forEach((cityList) => {
+    cityList.sort((a, b) =>
+      a.city.localeCompare(b.city, 'es', { sensitivity: 'base' })
+    );
+  });
+
+  return {
+    states,
+    stateLookup,
+    cityLookup,
+    citiesByState,
+  };
+}
+
+const URBANIZATION_LOOKUP = buildUrbanizationLookup(urbanizationsByCity);
+
+// Dataset sourced from https://github.com/zokeber/venezuela-json
+const {
+  states: STATE_OPTIONS,
+  cityLookup: CITY_LOOKUP,
+  citiesByState: CITIES_BY_STATE,
+} = buildLocationOptions(venezuelaLocations);
 
 function getDayKey(date) {
   return DAY_KEY_BY_INDEX[date.getDay()];
@@ -998,21 +1171,16 @@ function AuthScreen({ onSuccess, message, onPending }) {
   const [mode, setMode] = useState('login');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [venues, setVenues] = useState([]);
-  const [loadingVenues, setLoadingVenues] = useState(false);
-  const defaultEmail =
-    import.meta.env?.VITE_VENUE_ADMIN_EMAIL ?? 'daniela@fitzy.demo';
   const deviceName =
     import.meta.env?.VITE_VENUE_ADMIN_DEVICE_NAME ?? 'venue-admin-web';
 
   const [form, setForm] = useState({
-    email: defaultEmail,
+    fullName: '',
+    email: '',
     password: '',
-    firstName: '',
-    lastName: '',
     phone: '',
-    venueId: '',
-    isNewVenue: false,
+    venueStateId: '',
+    venueCityId: '',
     venueName: '',
     venueCity: '',
     venueNeighborhood: '',
@@ -1021,38 +1189,15 @@ function AuthScreen({ onSuccess, message, onPending }) {
   });
   const [savedAccounts, setSavedAccounts] = useState(() => loadSavedAccounts());
   const [pendingNotice, setPendingNotice] = useState(null);
-
-  useEffect(() => {
-    if (mode !== 'register' || venues.length > 0) return;
-
-    let active = true;
-    setLoadingVenues(true);
-    fitzy.entities.Venue.list()
-      .then((data) => {
-        if (!active) return;
-        if (Array.isArray(data)) {
-          setVenues(
-            [...data].sort((a, b) => a.name.localeCompare(b.name))
-          );
-        } else {
-          setVenues([]);
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          console.warn('No se pudieron cargar los venues disponibles.', err);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoadingVenues(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [mode, venues.length]);
+  const cityOptionsForState = useMemo(
+    () => (form.venueStateId ? CITIES_BY_STATE[form.venueStateId] ?? [] : []),
+    [form.venueStateId]
+  );
+  const selectedCity = useMemo(
+    () => (form.venueCityId ? CITY_LOOKUP[form.venueCityId] ?? null : null),
+    [form.venueCityId]
+  );
+  const availableZones = selectedCity?.zones ?? [];
 
   const handleFieldChange = (field, value) => {
     setForm((prev) => ({
@@ -1064,11 +1209,24 @@ function AuthScreen({ onSuccess, message, onPending }) {
     }
   };
 
-  const handleVenueModeChange = (isNew) => {
+  const handleStateSelect = (stateId) => {
     setForm((prev) => ({
       ...prev,
-      isNewVenue: isNew,
-      venueId: isNew ? '' : prev.venueId,
+      venueStateId: stateId,
+      venueCityId: '',
+      venueCity: '',
+      venueNeighborhood: '',
+    }));
+    setPendingNotice(null);
+  };
+
+  const handleCitySelect = (cityId) => {
+    const option = cityId ? CITY_LOOKUP[cityId] ?? null : null;
+    setForm((prev) => ({
+      ...prev,
+      venueCityId: cityId,
+      venueCity: option?.city ?? '',
+      venueNeighborhood: '',
     }));
     setPendingNotice(null);
   };
@@ -1102,22 +1260,36 @@ function AuthScreen({ onSuccess, message, onPending }) {
       return;
     }
 
+    let validatedName = null;
+
     if (mode === 'register') {
-      if (!form.firstName.trim() || !form.lastName.trim()) {
-        setError('Ingresa nombre y apellido.');
+      validatedName = splitFullName(form.fullName);
+      if (!validatedName.firstName || !validatedName.lastName) {
+        setError('Ingresa nombre y apellido completos.');
         return;
       }
       if (password.length < 8) {
         setError('La contraseña debe tener al menos 8 caracteres.');
         return;
       }
-      if (form.isNewVenue) {
-        if (!form.venueName.trim()) {
-          setError('Describe el nombre comercial de tu venue.');
-          return;
-        }
-      } else if (!form.venueId) {
-        setError('Selecciona el venue al que pertenecerás.');
+      if (!form.phone.trim()) {
+        setError('Indica un teléfono de contacto.');
+        return;
+      }
+      if (!form.venueName.trim()) {
+        setError('Describe el nombre comercial de tu venue.');
+        return;
+      }
+      if (!form.venueStateId) {
+        setError('Selecciona el estado del venue.');
+        return;
+      }
+      if (!form.venueCityId) {
+        setError('Selecciona la ciudad del venue.');
+        return;
+      }
+      if (!form.venueNeighborhood) {
+        setError('Selecciona la urbanización del venue.');
         return;
       }
     }
@@ -1140,6 +1312,7 @@ function AuthScreen({ onSuccess, message, onPending }) {
           const nextSaved = [
             {
               email,
+              contactName: loginUser?.name ?? '',
               firstName: loginUser?.first_name ?? '',
               lastName: loginUser?.last_name ?? '',
               venueName: loginUser?.venue?.name ?? '',
@@ -1152,19 +1325,19 @@ function AuthScreen({ onSuccess, message, onPending }) {
         setPendingNotice(null);
         user = loginUser;
       } else {
+        const nameParts = validatedName ?? splitFullName(form.fullName);
         const registration = await fitzy.auth.register({
           email,
           password,
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
+          firstName: nameParts.firstName,
+          lastName: nameParts.lastName,
           phone: form.phone.trim() || null,
           role: 'venue_admin',
-          venueId: form.isNewVenue && !form.venueId ? null : form.venueId ? Number(form.venueId) : null,
-          venueName: form.isNewVenue ? form.venueName.trim() : null,
-          venueCity: form.isNewVenue ? form.venueCity.trim() || null : null,
-          venueNeighborhood: form.isNewVenue ? form.venueNeighborhood.trim() || null : null,
-          venueAddress: form.isNewVenue ? form.venueAddress.trim() || null : null,
-          venueDescription: form.isNewVenue ? form.venueDescription.trim() || null : null,
+          venueName: form.venueName.trim(),
+          venueCity: form.venueCity.trim() || null,
+          venueNeighborhood: form.venueNeighborhood.trim() || null,
+          venueAddress: form.venueAddress.trim() || null,
+          venueDescription: form.venueDescription.trim() || null,
           deviceName,
         });
 
@@ -1175,9 +1348,7 @@ function AuthScreen({ onSuccess, message, onPending }) {
           setPendingNotice({
             message: pendingMessage,
             email,
-            venueName: form.isNewVenue
-              ? form.venueName.trim()
-              : venues.find((venue) => Number(venue.id) === Number(form.venueId))?.name ?? '',
+            venueName: form.venueName.trim(),
           });
           if (typeof onPending === 'function') {
             onPending(pendingMessage);
@@ -1191,13 +1362,16 @@ function AuthScreen({ onSuccess, message, onPending }) {
         }
 
         user = registration.user;
-        const venueName =
-          form.isNewVenue
-            ? form.venueName.trim()
-            : venues.find((venue) => Number(venue.id) === Number(form.venueId))
-                ?.name ?? '';
+        const venueName = form.venueName.trim();
+        const contactName = `${nameParts.firstName} ${nameParts.lastName}`.trim();
         const newSaved = [
-          { email, firstName: form.firstName.trim(), lastName: form.lastName.trim(), venueName },
+          {
+            email,
+            contactName,
+            firstName: nameParts.firstName,
+            lastName: nameParts.lastName,
+            venueName,
+          },
           ...savedAccounts.filter(
             (account) => account.email.toLowerCase() !== email
           ),
@@ -1245,7 +1419,6 @@ function AuthScreen({ onSuccess, message, onPending }) {
       ...prev,
       email: account.email,
       password: '',
-      isNewVenue: false,
     }));
     setError('');
   };
@@ -1395,34 +1568,24 @@ function AuthScreen({ onSuccess, message, onPending }) {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             {mode === 'register' ? (
-              <div className="auth-grid">
-                <FormField label="Nombre" id="auth-first-name">
-                  <input
-                    id="auth-first-name"
-                    type="text"
-                    className="control"
-                    value={form.firstName}
-                    onChange={(event) =>
-                      handleFieldChange('firstName', event.target.value)
-                    }
-                    autoComplete="given-name"
-                    required
-                  />
-                </FormField>
-                <FormField label="Apellido" id="auth-last-name">
-                  <input
-                    id="auth-last-name"
-                    type="text"
-                    className="control"
-                    value={form.lastName}
-                    onChange={(event) =>
-                      handleFieldChange('lastName', event.target.value)
-                    }
-                    autoComplete="family-name"
-                    required
-                  />
-                </FormField>
-              </div>
+              <FormField
+                label="Nombre completo del responsable"
+                id="auth-full-name"
+                hint="Tal como aparecería en una factura."
+              >
+                <input
+                  id="auth-full-name"
+                  type="text"
+                  className="control"
+                  value={form.fullName}
+                  onChange={(event) =>
+                    handleFieldChange('fullName', event.target.value)
+                  }
+                  placeholder="Nombre y apellido"
+                  autoComplete="name"
+                  required
+                />
+              </FormField>
             ) : null}
 
             <FormField label="Correo electrónico" id="auth-email">
@@ -1439,7 +1602,7 @@ function AuthScreen({ onSuccess, message, onPending }) {
 
             {mode === 'register' ? (
               <>
-                <FormField label="Teléfono (opcional)" id="auth-phone">
+                <FormField label="Teléfono de contacto" id="auth-phone">
                   <input
                     id="auth-phone"
                     type="tel"
@@ -1449,127 +1612,138 @@ function AuthScreen({ onSuccess, message, onPending }) {
                       handleFieldChange('phone', event.target.value)
                     }
                     autoComplete="tel"
+                    placeholder="+58 414 0000000"
+                    required
                   />
                 </FormField>
                 <div className="auth-venue-switch">
-                  <p className="auth-venue-switch-label">
-                    ¿Tu estudio ya existe en Fitzy?
+                  <p className="auth-venue-switch-label">Dirección del venue</p>
+                  <p className="form-hint">
+                    Completa los campos como si estuvieras llenando una dirección de facturación.
                   </p>
-                  <div className="auth-venue-switch-actions">
-                    <button
-                      type="button"
-                      className={`auth-venue-option ${
-                        !form.isNewVenue ? 'auth-venue-option--active' : ''
-                      }`}
-                      onClick={() => handleVenueModeChange(false)}
-                    >
-                      Ya opera en Fitzy
-                    </button>
-                    <button
-                      type="button"
-                      className={`auth-venue-option ${
-                        form.isNewVenue ? 'auth-venue-option--active' : ''
-                      }`}
-                      onClick={() => handleVenueModeChange(true)}
-                    >
-                      Necesito registrarlo
-                    </button>
-                  </div>
                 </div>
-                {form.isNewVenue ? (
-                  <>
-                    <FormField label="Nombre comercial del venue" id="auth-venue-name">
-                      <input
-                        id="auth-venue-name"
-                        type="text"
-                        className="control"
-                        value={form.venueName}
-                        onChange={(event) =>
-                          handleFieldChange('venueName', event.target.value)
-                        }
-                        placeholder="Ej. Studio 33"
-                      />
-                    </FormField>
-                    <div className="auth-grid">
-                      <FormField label="Ciudad" id="auth-venue-city">
-                        <input
-                          id="auth-venue-city"
-                          type="text"
-                          className="control"
-                          value={form.venueCity}
-                          onChange={(event) =>
-                            handleFieldChange('venueCity', event.target.value)
-                          }
-                          placeholder="Caracas"
-                        />
-                      </FormField>
-                      <FormField label="Zona o barrio" id="auth-venue-neighborhood">
-                        <input
-                          id="auth-venue-neighborhood"
-                          type="text"
-                          className="control"
-                          value={form.venueNeighborhood}
-                          onChange={(event) =>
-                            handleFieldChange('venueNeighborhood', event.target.value)
-                          }
-                          placeholder="Las Mercedes"
-                        />
-                      </FormField>
-                    </div>
-                    <FormField label="Dirección (opcional)" id="auth-venue-address">
-                      <input
-                        id="auth-venue-address"
-                        type="text"
-                        className="control"
-                        value={form.venueAddress}
-                        onChange={(event) =>
-                          handleFieldChange('venueAddress', event.target.value)
-                        }
-                        placeholder="Av. Principal, piso 2"
-                      />
-                    </FormField>
-                    <FormField
-                      label="Cuéntanos en qué consiste (opcional)"
-                      id="auth-venue-description"
-                      hint="Usamos esta descripción para validar tu solicitud."
-                    >
-                      <textarea
-                        id="auth-venue-description"
-                        className="control control--textarea"
-                        rows={3}
-                        value={form.venueDescription}
-                        onChange={(event) =>
-                          handleFieldChange('venueDescription', event.target.value)
-                        }
-                        placeholder="Entrenamientos funcionales, yoga y programas personalizados."
-                      />
-                    </FormField>
-                  </>
-                ) : (
-                  <FormField label="Selecciona tu venue" id="auth-venue">
+                <FormField label="Estado" id="auth-venue-state">
+                  <select
+                    id="auth-venue-state"
+                    className="control"
+                    value={form.venueStateId}
+                    onChange={(event) => handleStateSelect(event.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona un estado</option>
+                    {STATE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <div className="auth-grid">
+                  <FormField
+                    label="Ciudad"
+                    id="auth-venue-city"
+                    hint={
+                      form.venueStateId ? undefined : 'Selecciona primero el estado.'
+                    }
+                  >
                     <select
-                      id="auth-venue"
+                      id="auth-venue-city"
                       className="control"
-                      value={form.venueId}
-                      onChange={(event) =>
-                        handleFieldChange('venueId', event.target.value)
-                      }
+                      value={form.venueCityId}
+                      onChange={(event) => handleCitySelect(event.target.value)}
+                      disabled={!form.venueStateId}
                       required
                     >
-                      <option value="">Selecciona un venue</option>
-                      {loadingVenues ? (
-                        <option value="" disabled>
-                          Cargando venues...
-                        </option>
-                      ) : null}
-                      {venues.map((venue) => (
-                        <option key={venue.id} value={venue.id}>
-                          {venue.name}
+                      <option value="">
+                        {form.venueStateId
+                          ? 'Selecciona una ciudad'
+                          : 'Selecciona el estado primero'}
+                      </option>
+                      {cityOptionsForState.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.city}
                         </option>
                       ))}
                     </select>
                   </FormField>
-                )}
+                  <FormField
+                    label="Urbanización"
+                    id="auth-venue-neighborhood"
+                    hint={
+                      form.venueCityId
+                        ? undefined
+                        : 'Selecciona primero la ciudad.'
+                    }
+                  >
+                    <select
+                      id="auth-venue-neighborhood"
+                      className="control"
+                      value={form.venueNeighborhood}
+                      onChange={(event) =>
+                        handleFieldChange('venueNeighborhood', event.target.value)
+                      }
+                      disabled={!form.venueCityId}
+                      required
+                    >
+                      <option value="">
+                        {form.venueCityId
+                          ? 'Selecciona una urbanización'
+                          : 'Selecciona la ciudad primero'}
+                      </option>
+                      {availableZones.map((zone) => (
+                        <option key={zone} value={zone}>
+                          {zone}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
+                <FormField
+                  label="Dirección (opcional)"
+                  id="auth-venue-address"
+                  hint="Calle y número, piso o referencia."
+                >
+                  <input
+                    id="auth-venue-address"
+                    type="text"
+                    className="control"
+                    value={form.venueAddress}
+                    onChange={(event) =>
+                      handleFieldChange('venueAddress', event.target.value)
+                    }
+                    placeholder="Av. Principal, piso 2"
+                    autoComplete="street-address"
+                  />
+                </FormField>
+                <FormField label="Nombre comercial del venue" id="auth-venue-name">
+                  <input
+                    id="auth-venue-name"
+                    type="text"
+                    className="control"
+                    value={form.venueName}
+                    onChange={(event) =>
+                      handleFieldChange('venueName', event.target.value)
+                    }
+                    placeholder="Ej. Studio 33"
+                    required
+                  />
+                </FormField>
+                <FormField
+                  label="Cuéntanos en qué consiste (opcional)"
+                  id="auth-venue-description"
+                  hint="Usamos esta descripción para validar tu solicitud."
+                >
+                  <textarea
+                    id="auth-venue-description"
+                    className="control control--textarea"
+                    rows={3}
+                    value={form.venueDescription}
+                    onChange={(event) =>
+                      handleFieldChange('venueDescription', event.target.value)
+                    }
+                    placeholder="Entrenamientos funcionales, yoga y programas personalizados."
+                  />
+                </FormField>
               </>
             ) : null}
 
@@ -1600,9 +1774,7 @@ function AuthScreen({ onSuccess, message, onPending }) {
                 ? 'Procesando...'
                 : mode === 'login'
                   ? 'Ingresar'
-                  : form.isNewVenue
-                    ? 'Enviar solicitud'
-                    : 'Crear cuenta'}
+                  : 'Enviar solicitud'}
             </button>
           </form>
 
@@ -1626,39 +1798,41 @@ function AuthScreen({ onSuccess, message, onPending }) {
             <div className="auth-saved">
               <p className="auth-saved-title">Cuentas de prueba guardadas</p>
               <ul className="auth-saved-list">
-                {savedAccounts.map((account) => (
-                  <li key={account.email} className="auth-saved-item">
-                    <div className="auth-saved-info">
-                      <span className="auth-saved-name">
-                        {account.firstName || account.lastName
-                          ? `${account.firstName} ${account.lastName}`.trim()
-                          : account.email}
-                      </span>
-                      <span className="auth-saved-email">{account.email}</span>
-                      {account.venueName ? (
-                        <span className="auth-saved-venue">{account.venueName}</span>
-                      ) : null}
-                    </div>
-                    <div className="auth-saved-actions">
-                      <button
-                        type="button"
-                        className="auth-link auth-link--sm"
-                        onClick={() => handleApplySavedAccount(account)}
-                        disabled={submitting}
-                      >
-                        Usar
-                      </button>
-                      <button
-                        type="button"
-                        className="auth-link auth-link--danger auth-link--sm"
-                        onClick={() => handleRemoveSavedAccount(account.email)}
-                        disabled={submitting}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                {savedAccounts.map((account) => {
+                  const displayName =
+                    account.contactName?.trim() ||
+                    `${account.firstName ?? ''} ${account.lastName ?? ''}`.trim() ||
+                    account.email;
+                  return (
+                    <li key={account.email} className="auth-saved-item">
+                      <div className="auth-saved-info">
+                        <span className="auth-saved-name">{displayName}</span>
+                        <span className="auth-saved-email">{account.email}</span>
+                        {account.venueName ? (
+                          <span className="auth-saved-venue">{account.venueName}</span>
+                        ) : null}
+                      </div>
+                      <div className="auth-saved-actions">
+                        <button
+                          type="button"
+                          className="auth-link auth-link--sm"
+                          onClick={() => handleApplySavedAccount(account)}
+                          disabled={submitting}
+                        >
+                          Usar
+                        </button>
+                        <button
+                          type="button"
+                          className="auth-link auth-link--danger auth-link--sm"
+                          onClick={() => handleRemoveSavedAccount(account.email)}
+                          disabled={submitting}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}
@@ -1871,6 +2045,9 @@ function App() {
   );
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [classView, setClassView] = useState({
+    dayFilter: 'all',
+  });
   const [filters, setFilters] = useState({
     seriesMode: 'both',
     range: '6m',
@@ -2339,6 +2516,27 @@ function App() {
         return aStart.localeCompare(bStart);
       });
   }, [classes, uiState.selectedDate]);
+
+  const filteredDayClasses = useMemo(() => {
+    if (classView.dayFilter === 'all') return selectedDayClasses;
+    return selectedDayClasses.filter((session) => {
+      const occupied = Number(session.booked ?? session.capacity_taken ?? 0);
+      const capacity = Number(session.capacity ?? session.capacity_total ?? 0);
+      const waitlist =
+        session.waitlistCount ??
+        (Array.isArray(session.waitlist) ? session.waitlist.length : 0);
+      if (classView.dayFilter === 'full') {
+        return capacity > 0 && occupied >= capacity;
+      }
+      if (classView.dayFilter === 'waitlist') {
+        return waitlist > 0;
+      }
+      if (classView.dayFilter === 'available') {
+        return capacity === 0 || occupied < capacity;
+      }
+      return true;
+    });
+  }, [selectedDayClasses, classView.dayFilter]);
 
   const lookupInstructorName = useCallback((id) => {
     if (id === null || id === undefined || id === '') return 'Por asignar';
@@ -3062,6 +3260,19 @@ function App() {
     }));
   };
 
+  const handleShiftSelectedDate = (deltaDays) => {
+    const baseDate = uiState.selectedDate ?? new Date();
+    const nextDate = addDays(baseDate, deltaDays);
+    handleSelectDate(nextDate);
+    const currentMonth = uiState.calendarMonth ?? startOfMonth(new Date());
+    if (
+      nextDate.getMonth() !== currentMonth.getMonth() ||
+      nextDate.getFullYear() !== currentMonth.getFullYear()
+    ) {
+      handleMonthChange(nextDate);
+    }
+  };
+
   const handleMonthChange = (date) => {
     updateUi({
       calendarMonth: startOfMonth(date),
@@ -3095,9 +3306,6 @@ function App() {
     }
     if (!createClassForm.typeId) {
       errors.typeId = 'Selecciona un tipo de clase';
-    }
-    if (!createClassForm.roomId) {
-      errors.roomId = 'Selecciona una sala';
     }
     if (!createClassForm.time) {
       errors.time = 'Selecciona un horario';
@@ -4014,20 +4222,59 @@ function App() {
       year: 'numeric',
     });
     const isLoadingDay = loadingClasses && classes.length === 0;
+    const goToToday = () => {
+      const today = new Date();
+      handleMonthChange(today);
+      handleSelectDate(today);
+    };
+    const selectedDayOccupancyPct =
+      selectedDaySummary.capacity > 0
+        ? Math.min(
+            100,
+            Math.round((selectedDaySummary.occupied / selectedDaySummary.capacity) * 100)
+          )
+        : selectedDaySummary.occupied > 0
+          ? 100
+          : 0;
+    const dayFilterOptions = [
+      { value: 'all', label: 'Todas' },
+      { value: 'available', label: 'Disponibles' },
+      { value: 'full', label: 'Llenas' },
+      { value: 'waitlist', label: 'Con espera' },
+    ];
+    const handleDayFilterChange = (value) => {
+      setClassView((prev) => ({
+        ...prev,
+        dayFilter: value,
+      }));
+    };
+    const handleShiftDay = (delta) => handleShiftSelectedDate(delta);
 
     return (
       <div className="classes-view">
-        <section className="classes-header">
-          <div className="classes-header-text">
-            <span className="classes-eyebrow">Gestión de clases</span>
-            <h1 className="classes-title">Planificador de clases</h1>
-            <p className="classes-subtitle">
-              Crea sesiones, revisa el calendario y coordina a tu equipo. Todo lo programado aquí se refleja en el app de clientes.
+        <section className="classes-hero card">
+          <div className="classes-hero-body">
+            <span className="classes-hero-eyebrow">Gestión de clases</span>
+            <h1 className="classes-hero-title">Planificador de clases</h1>
+            <p className="classes-hero-subtitle">
+              Diseña tu programación con claridad. Ajusta horarios, confirma instructores y anticipa ocupación con herramientas pensadas para equipos modernos.
             </p>
+            <div className="classes-hero-actions">
+              <button type="button" className="btn btn--primary" onClick={goToToday}>
+                Ir a hoy
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => updateUi({ isAddingInstructor: true })}
+              >
+                Añadir instructor
+              </button>
+            </div>
           </div>
-          <div className="kpi-group">
+          <div className="classes-hero-kpis">
             {todayKpis.map((kpi) => (
-              <div key={kpi.label} className="kpi">
+              <div key={kpi.label} className="kpi kpi--flush">
                 <span className="kpi-label">{kpi.label}</span>
                 <span className="kpi-value">{kpi.value}</span>
               </div>
@@ -4035,13 +4282,250 @@ function App() {
           </div>
         </section>
 
-        <div className="classes-grid">
-          <section className="card classes-editor">
-            <div className="card-header card-header--subtle">
-              <div>
-                <h2>Crear clase</h2>
-                <p className="card-subtitle">Completa los detalles y guarda</p>
+        <div className="classes-toolbar card card--surface">
+          <div className="classes-toolbar-date">
+            <span className="classes-toolbar-eyebrow">Visualizando</span>
+            <strong>{selectedDateSummaryLabel}</strong>
+          </div>
+          <div className="classes-toolbar-controls">
+            <div className="classes-toolbar-buttons">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => handleShiftDay(-1)}
+              >
+                <Icon name="chevronLeft" size={16} /> Día anterior
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={goToToday}>
+                Hoy
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => handleShiftDay(1)}
+              >
+                Siguiente día <Icon name="chevronRight" size={16} />
+              </button>
+            </div>
+            <div className="classes-filters">
+              {dayFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`filter-chip ${
+                    classView.dayFilter === option.value ? 'filter-chip--active' : ''
+                  }`}
+                  onClick={() => handleDayFilterChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="classes-layout">
+          <div className="classes-column classes-column--secondary">
+            <section className="card calendar-panel">
+              <div className="calendar-panel-header">
+                <div>
+                  <span className="calendar-panel-eyebrow">Calendario</span>
+                  <h2>Agenda visual</h2>
+                </div>
+                <div className="calendar-panel-actions">
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={goToToday}>
+                    Hoy
+                  </button>
+                </div>
               </div>
+              <div className="calendar-panel-body">
+                <Calendar
+                  month={uiState.calendarMonth}
+                  selectedDate={uiState.selectedDate}
+                  onMonthChange={handleMonthChange}
+                  onSelectDate={handleSelectDate}
+                  badges={monthBadges}
+                />
+                <div className="calendar-meta">
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Clases</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.count)}
+                    </span>
+                  </div>
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Reservas</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.occupied)}
+                    </span>
+                  </div>
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Lista de espera</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.waitlist)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="schedule-divider" />
+              <div className="day-list">
+                <div className="day-list-heading">
+                  <div>
+                    <span className="day-list-eyebrow">{selectedDateSummaryLabel}</span>
+                    <h3>Clases programadas</h3>
+                  </div>
+                </div>
+                {isLoadingDay ? (
+                  <div className="empty-state empty-state--compact">Cargando clases...</div>
+                ) : filteredDayClasses.length === 0 ? (
+                  <div className="empty-state empty-state--compact">
+                    No hay clases para esta fecha.
+                  </div>
+                ) : (
+                  filteredDayClasses.map((session) => {
+                    const startValue = session.start ?? session.start_datetime;
+                    const endValue = session.end ?? session.end_datetime;
+                    const occupied = Number(session.booked ?? session.capacity_taken ?? 0);
+                    const capacity = Number(session.capacity ?? session.capacity_total ?? 0);
+                    const waitlist =
+                      session.waitlistCount ??
+                      (Array.isArray(session.waitlist) ? session.waitlist.length : 0);
+                    const isFull = capacity > 0 && occupied >= capacity;
+                    const classTypeName = lookupClassTypeName(session.typeId ?? session.classTypeId);
+                    const roomName = session.room?.name ?? lookupRoomName(session.roomId);
+                    const occupancyPct =
+                      capacity > 0 ? Math.min(100, Math.round((occupied / capacity) * 100)) : 0;
+                    return (
+                      <div key={session.id} className="day-list-item">
+                        <div className="day-item-info">
+                          <div className="item-title">{session.name ?? session.title}</div>
+                          <div className="item-subtitle">
+                            {timeRange(startValue, endValue)} •{' '}
+                            {lookupInstructorName(session.instructorId ?? session.instructor?.id)}
+                          </div>
+                          <div className="class-progress">
+                            <div className="class-progress-track">
+                              <div
+                                className="class-progress-value"
+                                style={{ width: `${occupancyPct}%` }}
+                              />
+                            </div>
+                            <span className="class-progress-label">
+                              {formatNumber(occupied)} / {formatNumber(capacity || 0)} cupos
+                            </span>
+                          </div>
+                          <div className="class-meta">
+                            {classTypeName ? (
+                              <span className="chip chip--info">{classTypeName}</span>
+                            ) : null}
+                            {roomName ? <span className="chip chip--neutral">{roomName}</span> : null}
+                            <span className={`chip ${isFull ? 'chip--alert' : 'chip--success'}`}>
+                              {occupied}/{capacity || '∞'} ocupados
+                            </span>
+                            {waitlist ? (
+                              <span className="chip chip--waitlist">{waitlist} en espera</span>
+                            ) : null}
+                          </div>
+                          <div className="class-actions">
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleViewSession(session.id)}
+                            >
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleDuplicateSession(session.id)}
+                            >
+                              Duplicar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleEditSession(session.id)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm btn--danger"
+                              onClick={() => handleCancelSession(session.id)}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--sm"
+                              onClick={() => handleCheckInSession(session.id)}
+                            >
+                              Check-in
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+
+            <section className="card day-summary-card">
+              <div className="day-summary-card-header">
+                <div>
+                  <span className="day-summary-eyebrow">Salud del día</span>
+                  <h2>Resumen del día</h2>
+                </div>
+                <span className="day-summary-date">{selectedDateSummaryLabel}</span>
+              </div>
+              <div className="day-summary-grid">
+                <div className="day-summary-item day-summary-item--progress">
+                  <span className="day-summary-label">Ocupación programada</span>
+                  <span className="day-summary-value">
+                    {formatNumber(selectedDayOccupancyPct)}%
+                  </span>
+                  <div className="day-summary-progress" aria-hidden="true">
+                    <div
+                      className="day-summary-progress-bar"
+                      style={{ width: `${Math.min(selectedDayOccupancyPct, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="day-summary-item">
+                  <span className="day-summary-label">Clases agendadas</span>
+                  <span className="day-summary-value">
+                    {formatNumber(selectedDaySummary.count)}
+                  </span>
+                  <span className="day-summary-hint">Sesiones en el día</span>
+                </div>
+                <div className="day-summary-item">
+                  <span className="day-summary-label">Reservas confirmadas</span>
+                  <span className="day-summary-value">
+                    {formatNumber(selectedDaySummary.occupied)}
+                  </span>
+                  <span className="day-summary-hint">
+                    De {formatNumber(selectedDaySummary.capacity)} cupos
+                  </span>
+                </div>
+                <div className="day-summary-item">
+                  <span className="day-summary-label">Lista de espera</span>
+                  <span className="day-summary-value">
+                    {formatNumber(selectedDaySummary.waitlist)}
+                  </span>
+                  <span className="day-summary-hint">Clientes esperando cupo</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="classes-column">
+            <section className="card classes-editor">
+              <div className="card-header card-header--subtle">
+                <div>
+                  <h2>Crear clase</h2>
+                  <p className="card-subtitle">Completa los detalles y guarda</p>
+                </div>
             </div>
             <form className="form-grid" onSubmit={handleClassFormSubmit}>
               <div className="form-grid-row form-grid-row--2">
@@ -4127,27 +4611,6 @@ function App() {
                   >
                     <option value="">Selecciona un instructor</option>
                     {instructorOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-                <FormField
-                  label="Sala"
-                  id="class-room"
-                  error={formErrors.roomId}
-                  hint={loadingRooms ? 'Cargando salas disponibles...' : undefined}
-                >
-                  <select
-                    id="class-room"
-                    className="control"
-                    disabled={loadingRooms || roomOptions.length === 0}
-                    value={createClassForm.roomId}
-                    onChange={(event) => handleCreateClassChange('roomId', event.target.value)}
-                  >
-                    <option value="">Principal</option>
-                    {roomOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -4345,13 +4808,22 @@ function App() {
               </p>
             </form>
           </section>
+          </div>
 
-          <aside className="classes-sidebar">
-            <section className="card">
-              <div className="card-header">
-                <h2>Calendario de clases</h2>
+          <div className="classes-column classes-column--secondary">
+            <section className="card calendar-panel">
+              <div className="calendar-panel-header">
+                <div>
+                  <span className="calendar-panel-eyebrow">Calendario</span>
+                  <h2>Agenda visual</h2>
+                </div>
+                <div className="calendar-panel-actions">
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={goToToday}>
+                    Hoy
+                  </button>
+                </div>
               </div>
-              <div className="stack">
+              <div className="calendar-panel-body">
                 <Calendar
                   month={uiState.calendarMonth}
                   selectedDate={uiState.selectedDate}
@@ -4359,116 +4831,132 @@ function App() {
                   onSelectDate={handleSelectDate}
                   badges={monthBadges}
                 />
-                <div className="divider" />
-                <div className="day-list">
-                  <h3>Clases para este día</h3>
-                  {isLoadingDay ? (
-                    <div className="empty-state empty-state--compact">Cargando clases...</div>
-                  ) : selectedDayClasses.length === 0 ? (
-                    <div className="empty-state empty-state--compact">
-                      No hay clases para esta fecha.
-                    </div>
-                  ) : (
-                    selectedDayClasses.map((session) => {
-                      const startValue = session.start ?? session.start_datetime;
-                      const endValue = session.end ?? session.end_datetime;
-                      const occupied = Number(session.booked ?? session.capacity_taken ?? 0);
-                      const capacity = Number(session.capacity ?? session.capacity_total ?? 0);
-                      const waitlist =
-                        session.waitlistCount ??
-                        (Array.isArray(session.waitlist) ? session.waitlist.length : 0);
-                      const isFull = capacity > 0 && occupied >= capacity;
-                      const classTypeName = lookupClassTypeName(session.typeId ?? session.classTypeId);
-                      const roomName = session.room?.name ?? lookupRoomName(session.roomId);
-                      return (
-                        <div key={session.id} className="day-list-item">
-                          <div className="day-item-info">
-                            <div className="item-title">{session.name ?? session.title}</div>
-                            <div className="item-subtitle">
-                              {timeRange(startValue, endValue)} • {lookupInstructorName(session.instructorId ?? session.instructor?.id)}
+                <div className="calendar-meta">
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Clases</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.count)}
+                    </span>
+                  </div>
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Reservas</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.occupied)}
+                    </span>
+                  </div>
+                  <div className="calendar-meta-item">
+                    <span className="calendar-meta-label">Lista de espera</span>
+                    <span className="calendar-meta-value">
+                      {formatNumber(selectedDaySummary.waitlist)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="schedule-divider" />
+              <div className="day-list">
+                <div className="day-list-heading">
+                  <div>
+                    <span className="day-list-eyebrow">{selectedDateSummaryLabel}</span>
+                    <h3>Clases programadas</h3>
+                  </div>
+                </div>
+                {isLoadingDay ? (
+                  <div className="empty-state empty-state--compact">Cargando clases...</div>
+                ) : filteredDayClasses.length === 0 ? (
+                  <div className="empty-state empty-state--compact">
+                    No hay clases para esta fecha.
+                  </div>
+                ) : (
+                  filteredDayClasses.map((session) => {
+                    const startValue = session.start ?? session.start_datetime;
+                    const endValue = session.end ?? session.end_datetime;
+                    const occupied = Number(session.booked ?? session.capacity_taken ?? 0);
+                    const capacity = Number(session.capacity ?? session.capacity_total ?? 0);
+                    const waitlist =
+                      session.waitlistCount ??
+                      (Array.isArray(session.waitlist) ? session.waitlist.length : 0);
+                    const isFull = capacity > 0 && occupied >= capacity;
+                    const classTypeName = lookupClassTypeName(session.typeId ?? session.classTypeId);
+                    const roomName = session.room?.name ?? lookupRoomName(session.roomId);
+                    const occupancyPct =
+                      capacity > 0 ? Math.min(100, Math.round((occupied / capacity) * 100)) : 0;
+                    return (
+                      <div key={session.id} className="day-list-item">
+                        <div className="day-item-info">
+                          <div className="item-title">{session.name ?? session.title}</div>
+                          <div className="item-subtitle">
+                            {timeRange(startValue, endValue)} •{' '}
+                            {lookupInstructorName(session.instructorId ?? session.instructor?.id)}
+                          </div>
+                          <div className="class-progress">
+                            <div className="class-progress-track">
+                              <div
+                                className="class-progress-value"
+                                style={{ width: `${occupancyPct}%` }}
+                              />
                             </div>
-                            <div className="class-meta">
-                              {classTypeName ? <span className="chip chip--info">{classTypeName}</span> : null}
-                              {roomName ? <span className="chip chip--neutral">{roomName}</span> : null}
-                              <span className={`chip ${isFull ? 'chip--alert' : 'chip--success'}`}>
-                                {occupied}/{capacity || '∞'} ocupados
-                              </span>
-                              {waitlist ? (
-                                <span className="chip chip--waitlist">{waitlist} en espera</span>
-                              ) : null}
-                            </div>
-                            <div className="class-actions">
-                              <button
-                                type="button"
-                                className="btn btn--ghost btn--sm"
-                                onClick={() => handleViewSession(session.id)}
-                              >
-                                Ver
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--ghost btn--sm"
-                                onClick={() => handleDuplicateSession(session.id)}
-                              >
-                                Duplicar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--ghost btn--sm"
-                                onClick={() => handleEditSession(session.id)}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--ghost btn--sm btn--danger"
-                                onClick={() => handleCancelSession(session.id)}
-                              >
-                                Cancelar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--primary btn--sm"
-                                onClick={() => handleCheckInSession(session.id)}
-                              >
-                                Check-in
-                              </button>
-                            </div>
+                            <span className="class-progress-label">
+                              {formatNumber(occupied)} / {formatNumber(capacity || 0)} cupos
+                            </span>
+                          </div>
+                          <div className="class-meta">
+                            {classTypeName ? (
+                              <span className="chip chip--info">{classTypeName}</span>
+                            ) : null}
+                            {roomName ? <span className="chip chip--neutral">{roomName}</span> : null}
+                            <span className={`chip ${isFull ? 'chip--alert' : 'chip--success'}`}>
+                              {occupied}/{capacity || '∞'} ocupados
+                            </span>
+                            {waitlist ? (
+                              <span className="chip chip--waitlist">{waitlist} en espera</span>
+                            ) : null}
+                          </div>
+                          <div className="class-actions">
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleViewSession(session.id)}
+                            >
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleDuplicateSession(session.id)}
+                            >
+                              Duplicar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              onClick={() => handleEditSession(session.id)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm btn--danger"
+                              onClick={() => handleCancelSession(session.id)}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--sm"
+                              onClick={() => handleCheckInSession(session.id)}
+                            >
+                              Check-in
+                            </button>
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </section>
 
-            <section className="card day-summary-card">
-              <div className="card-header">
-                <h2>Resumen del día</h2>
-              </div>
-              <div className="day-summary">
-                <div className="key-value">
-                  <span className="key-value-label">Fecha</span>
-                  <span className="key-value-value">{selectedDateSummaryLabel}</span>
-                </div>
-                <div className="key-value">
-                  <span className="key-value-label">Clases agendadas</span>
-                  <span className="key-value-value">{formatNumber(selectedDaySummary.count)}</span>
-                </div>
-                <div className="key-value">
-                  <span className="key-value-label">Reservas</span>
-                  <span className="key-value-value">
-                    {formatNumber(selectedDaySummary.occupied)}/{formatNumber(selectedDaySummary.capacity)}
-                  </span>
-                </div>
-                <div className="key-value">
-                  <span className="key-value-label">Lista de espera</span>
-                  <span className="key-value-value">{formatNumber(selectedDaySummary.waitlist)}</span>
-                </div>
-              </div>
-            </section>
-          </aside>
+          </div>
         </div>
       </div>
     );
@@ -4572,7 +5060,9 @@ function App() {
         </aside>
 
         <main className={`main main--${uiState.activePage}`}>
-          {uiState.activePage === 'home' ? renderDashboard() : renderClasses()}
+          <div className="page-content">
+            {uiState.activePage === 'home' ? renderDashboard() : renderClasses()}
+          </div>
         </main>
       </div>
 

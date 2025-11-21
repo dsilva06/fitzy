@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\PaymentStoreRequest;
 use App\Http\Requests\PaymentUpdateRequest;
+use App\Models\Status;
 
 class PaymentController extends Controller
 {
@@ -28,14 +29,21 @@ class PaymentController extends Controller
     public function store(PaymentStoreRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $statusValue = $data['status'] ?? 'pending';
+        $statusId = Status::idFor(Payment::class, $statusValue);
 
         $payment = Payment::create([
             'booking_id' => $data['booking_id'],
             'method' => $data['method'],
             'amount' => $data['amount'],
-            'status' => $data['status'] ?? 'pending',
+            'status' => $statusValue,
+            'status_id' => $statusId,
             'meta' => $data['meta'] ?? null,
         ]);
+
+        if (! $payment->status_id && $statusId) {
+            $payment->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($payment->fresh('booking'), 201);
     }
@@ -48,8 +56,17 @@ class PaymentController extends Controller
     public function update(PaymentUpdateRequest $request, Payment $payment): JsonResponse
     {
         $data = $request->validated();
+        $statusId = null;
+
+        if (array_key_exists('status', $data)) {
+            $statusId = Status::idFor(Payment::class, $data['status']);
+        }
 
         $payment->fill($data)->save();
+
+        if ($statusId) {
+            $payment->forceFill(['status_id' => $statusId])->save();
+        }
 
         return response()->json($payment->fresh('booking'));
     }

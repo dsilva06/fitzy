@@ -1,14 +1,19 @@
 const PAGE_SLUGS: Record<string, string> = {
     Home: 'home',
     Explore: 'explore',
+    ExploreClasses: 'explore/classes',
+    ExploreCourts: 'explore/courts',
     Calendar: 'calendar',
     Favorites: 'favorites',
-    VenueSchedule: 'venue-schedule',
+    VenueDetails: 'venues',
+    CourtDetails: 'complexes',
+    CourtSchedule: 'courts',
     ReservationDetails: 'reservation-details',
     Packages: 'packages',
     PersonalInfo: 'personal-info',
     Wallet: 'wallet',
-    CategoryResults: 'category-results',
+    CategoryResults: 'explore/classes',
+    CourtCategoryResults: 'explore/courts',
     CategorySchedule: 'category-schedule',
 };
 
@@ -59,6 +64,18 @@ export function createPageUrl(pageName: string) {
     return `/${slug}`;
 }
 
+const DYNAMIC_ROUTE_PATTERNS: { name: string; regex: RegExp }[] = [
+    { name: 'VenueSchedule', regex: /^venues\/[^/]+\/schedule/ },
+    { name: 'VenueDetails', regex: /^venues\/[^/]+$/ },
+    { name: 'CourtSchedule', regex: /^courts\/[^/]+$/ },
+    { name: 'CourtDetails', regex: /^complexes\/[^/]+$/ },
+    { name: 'CategorySchedule', regex: /^explore\/classes\/[^/]+\/schedule/ },
+    { name: 'CategoryResults', regex: /^explore\/classes\/[^/]+/ },
+    { name: 'CourtCategoryResults', regex: /^explore\/courts\/[^/]+/ },
+    { name: 'ExploreCourts', regex: /^explore\/courts$/ },
+    { name: 'ExploreClasses', regex: /^explore\/classes$/ },
+];
+
 export function getPageNameFromPath(pathname: string | null | undefined) {
     if (!pathname || pathname === '/' || pathname === '') {
         return 'Home';
@@ -77,11 +94,59 @@ export function getPageNameFromPath(pathname: string | null | undefined) {
         return 'Home';
     }
 
-    return slugToPageName(segment) ?? 'Home';
+    for (const pattern of DYNAMIC_ROUTE_PATTERNS) {
+        if (pattern.regex.test(segment)) {
+            return pattern.name;
+        }
+    }
+
+    const matchedSlug = Object.entries(PAGE_SLUGS).find(([, slug]) => {
+        return segment === slug || segment.startsWith(`${slug}/`);
+    });
+    if (matchedSlug) {
+        return matchedSlug[0];
+    }
+
+    const [firstSegment] = segment.split('/');
+    return slugToPageName(firstSegment) ?? 'Home';
 }
 
 export function getLocalToday(): Date {
     const now = new Date();
     now.setHours(12, 0, 0, 0);
     return now;
+}
+
+const COURT_KEYWORDS = ['court', 'padel', 'tennis', 'pickle', 'pickleball'];
+
+export function isCourtVenue(venue: { name?: string | null; description?: string | null } | null | undefined) {
+    if (!venue) return false;
+    const haystacks = [venue.name, venue.description]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+
+    return COURT_KEYWORDS.some((keyword) =>
+        haystacks.some((haystack) => haystack.includes(keyword))
+    );
+}
+
+export function toCategorySlug(name: string | null | undefined) {
+    if (!name) return '';
+    return name
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+export function fromCategorySlug(slug: string | null | undefined) {
+    if (!slug) return '';
+    return slug
+        .toString()
+        .split('-')
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }

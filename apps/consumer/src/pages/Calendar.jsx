@@ -100,7 +100,7 @@ export default function CalendarPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        onClick={() => navigate(createPageUrl("ReservationDetails") + `?bookingId=${booking.id}`)}
+        onClick={() => navigate(`${createPageUrl("ReservationDetails")}/${encodeURIComponent(booking.id)}`)}
         className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer"
       >
         <div className="flex items-start justify-between mb-4">

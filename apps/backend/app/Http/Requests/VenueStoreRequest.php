@@ -23,9 +23,15 @@ class VenueStoreRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:venues,email'],
+            'phone' => ['required', 'string', 'max:20'],
+            'rif' => ['required', 'string', 'max:50', 'unique:venues,rif'],
+            'website' => ['nullable', 'url', 'max:255'],
+            'status' => ['required', 'in:pending,approved,rejected'],
+            'venue_type' => ['required', 'in:class_studio,retail_store,other'],
             'neighborhood' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:255'],
+            'address' => ['required', 'string', 'max:255'],
             'rating' => ['nullable', 'numeric', 'between:0,5'],
             'logo_url' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],

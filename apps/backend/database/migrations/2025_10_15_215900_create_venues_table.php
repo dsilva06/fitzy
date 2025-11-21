@@ -14,7 +14,11 @@ return new class extends Migration
         Schema::create('venues', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('email')->unique();
+            $table->string('phone')->unique();
+            $table->string('rif')->unique();
             $table->string('neighborhood')->nullable();
+            $table->string('status');
             $table->string('city')->nullable();
             $table->string('address')->nullable();
             $table->float('rating')->nullable();

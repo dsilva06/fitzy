@@ -1,24 +1,33 @@
-
-import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { createPageUrl, getLocalToday } from "@/utils";
+import React, { useMemo, useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { getLocalToday, fromCategorySlug, toCategorySlug, isCourtVenue } from "@/utils";
 import { useQuery } from "@tanstack/react-query";
 import { fitzy } from "@/api/fitzyClient";
 import { format, isSameDay } from "date-fns";
 import { ChevronLeft, MapPin, Star, Heart, Clock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CheckoutSheet from "../components/checkout/CheckoutSheet";
+import { useFavoriteVenue } from "@/hooks/useFavoriteVenue";
 
-const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavoriteToggle, isFavorite }) => {
+const VenueClassCard = ({ venue, sessions, classType, categorySlug, onTimeChipSelect }) => {
   const navigate = useNavigate();
+  const { isFavorite, toggleFavorite } = useFavoriteVenue(venue?.id);
 
   const handleViewSchedule = (e) => {
     e.stopPropagation();
-    navigate(createPageUrl("CategorySchedule") + `?category=${encodeURIComponent(classType.name)}`);
+    navigate(`/explore/classes/${categorySlug}/schedule`);
+  };
+
+  const handleFavoriteClick = (e) => {
+    e.stopPropagation();
+    const handled = toggleFavorite();
+    if (!handled) {
+      alert("Log in to save venues to your favorites.");
+    }
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -45,8 +54,8 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
               )}
             </div>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onFavoriteToggle(); }} className="p-2">
-            <Heart className={`w-6 h-6 transition-all ${isFavorite ? 'text-red-500 fill-red-500' : 'text-gray-300'}`} />
+          <button onClick={handleFavoriteClick} className="p-2">
+            <Heart className={`w-6 h-6 transition-all ${isFavorite ? "text-red-500 fill-red-500" : "text-gray-300"}`} />
           </button>
         </div>
       </div>
@@ -55,7 +64,7 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
         {sessions.length > 0 ? (
           <>
             <div className="flex space-x-2 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar">
-              {sessions.map(session => (
+              {sessions.map((session) => (
                 <button
                   key={session.id}
                   onClick={() => onTimeChipSelect(session, venue)}
@@ -65,8 +74,8 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
                 </button>
               ))}
             </div>
-            <button 
-              onClick={handleViewSchedule} 
+            <button
+              onClick={handleViewSchedule}
               className="mt-3 flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors"
             >
               View schedule <ArrowRight className="w-4 h-4" />
@@ -86,31 +95,61 @@ const VenueClassCard = ({ venue, sessions, classType, onTimeChipSelect, onFavori
 
 export default function CategoryResultsPage() {
   const navigate = useNavigate();
-  const urlParams = new URLSearchParams(window.location.search);
-  const categoryName = urlParams.get('category');
+  const { categorySlug = "" } = useParams();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const legacyCategory = params.get("category");
+  const effectiveSlug = categorySlug || (legacyCategory ? toCategorySlug(legacyCategory) : "");
+  const categoryName = legacyCategory || fromCategorySlug(effectiveSlug) || "Classes";
 
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedVenue, setSelectedVenue] = useState(null);
 
-  const { data: user } = useQuery({ queryKey: ['currentUser'], queryFn: () => fitzy.auth.me() });
-  const { data: favorites = [] } = useQuery({ 
-      queryKey: ['favorites', user?.id], 
-      queryFn: () => fitzy.entities.Favorite.filter({ user_id: user.id }),
-      enabled: !!user 
+  const { data: classTypes = [] } = useQuery({
+    queryKey: ["classTypes"],
+    queryFn: () => fitzy.entities.ClassType.list(),
   });
-  const { data: classTypes = [] } = useQuery({ queryKey: ['classTypes'], queryFn: () => fitzy.entities.ClassType.list() });
-  const { data: venues = [] } = useQuery({ queryKey: ['venues'], queryFn: () => fitzy.entities.Venue.list() });
-  const { data: allSessions = [] } = useQuery({ queryKey: ['allSessions'], queryFn: () => fitzy.entities.Session.list() });
-  
-  const classType = useMemo(() => classTypes.find(c => c.name === categoryName), [classTypes, categoryName]);
+  const { data: venues = [] } = useQuery({
+    queryKey: ["venues"],
+    queryFn: () => fitzy.entities.Venue.list(),
+  });
+  const { data: allSessions = [] } = useQuery({
+    queryKey: ["allSessions"],
+    queryFn: () => fitzy.entities.Session.list(),
+  });
+
+  const classType = useMemo(
+    () => classTypes.find((c) => toCategorySlug(c.name) === effectiveSlug.toLowerCase()),
+    [classTypes, effectiveSlug]
+  );
+
+  const matchingVenueIds = useMemo(() => {
+    return new Set(
+      venues
+        .filter(
+          (venue) =>
+            Array.isArray(venue.categories) &&
+            venue.categories.some((category) => toCategorySlug(category) === effectiveSlug.toLowerCase())
+        )
+        .map((venue) => String(venue.id))
+    );
+  }, [venues, effectiveSlug]);
   const today = useMemo(() => getLocalToday(), []);
 
   const venuesWithTodayClasses = useMemo(() => {
-    if (!classType || venues.length === 0 || allSessions.length === 0) return [];
-    
-    const todaySessions = allSessions.filter(s => s.class_type_id === classType.id && isSameDay(new Date(s.start_datetime), today));
-    
+    if (venues.length === 0 || allSessions.length === 0) return [];
+
+    const todaySessions = allSessions.filter((s) => {
+      const isToday = isSameDay(new Date(s.start_datetime), today);
+      if (!isToday) return false;
+
+      if (classType) {
+        return s.class_type_id === classType.id;
+      }
+      return matchingVenueIds.has(String(s.venue_id));
+    });
+
     const sessionsByVenue = todaySessions.reduce((acc, session) => {
       if (!acc[session.venue_id]) {
         acc[session.venue_id] = [];
@@ -119,15 +158,31 @@ export default function CategoryResultsPage() {
       return acc;
     }, {});
 
-    return Object.keys(sessionsByVenue).map(venueId => {
-      const venue = venues.find(v => v.id === venueId);
-      if (!venue) return null;
-      return {
-        venue,
-        sessions: sessionsByVenue[venueId].sort((a,b) => new Date(a.start_datetime) - new Date(b.start_datetime))
-      };
-    }).filter(Boolean);
-  }, [classType, venues, allSessions, today]);
+    let grouped = Object.keys(sessionsByVenue)
+      .map((venueId) => {
+        const venue = venues.find((v) => String(v.id) === String(venueId));
+        if (!venue || isCourtVenue(venue)) return null;
+        const venueMatchesCategory =
+          classType || matchingVenueIds.size === 0 ? true : matchingVenueIds.has(String(venue.id));
+        if (!venueMatchesCategory && !classType) return null;
+
+        return {
+          venue,
+          sessions: sessionsByVenue[venueId].sort(
+            (a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
+          ),
+        };
+      })
+      .filter(Boolean);
+
+    if (!classType && grouped.length === 0 && matchingVenueIds.size > 0) {
+      grouped = venues
+        .filter((venue) => matchingVenueIds.has(String(venue.id)) && !isCourtVenue(venue))
+        .map((venue) => ({ venue, sessions: [] }));
+    }
+
+    return grouped;
+  }, [classType, venues, allSessions, today, matchingVenueIds]);
 
   const handleTimeChipSelect = (session, venue) => {
     setSelectedSession(session);
@@ -135,14 +190,20 @@ export default function CategoryResultsPage() {
     setShowCheckout(true);
   };
 
-  const handleFavoriteToggle = (venueId) => {
-    // Mock favorite toggle logic
-    console.log("Toggling favorite for venue:", venueId);
-  };
-  
   const selectedSessionClassType = selectedSession
-    ? classTypes.find(c => c.id === selectedSession.class_type_id)
+    ? classTypes.find((c) => c.id === selectedSession.class_type_id)
     : null;
+
+  if (!classType && matchingVenueIds.size === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-2">
+          <p className="text-2xl font-semibold text-gray-900">Category not found</p>
+          <p className="text-gray-500">Try selecting another class category from Explore.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-20 pb-8 px-4 bg-gray-50">
@@ -158,24 +219,23 @@ export default function CategoryResultsPage() {
 
       <div className="space-y-4">
         {venuesWithTodayClasses.map(({ venue, sessions }) => (
-          <VenueClassCard 
+          <VenueClassCard
             key={venue.id}
             venue={venue}
             sessions={sessions}
             classType={classType}
+            categorySlug={effectiveSlug}
             onTimeChipSelect={handleTimeChipSelect}
-            onFavoriteToggle={() => handleFavoriteToggle(venue.id)}
-            isFavorite={favorites.some(f => f.venue_id === venue.id)}
           />
         ))}
         {venuesWithTodayClasses.length === 0 && (
-           <div className="text-center py-16 text-gray-500">
-             <h2 className="text-xl font-semibold mb-2">No {categoryName} classes scheduled for today.</h2>
-             <p>Check the full schedule for other days.</p>
-           </div>
+          <div className="text-center py-16 text-gray-500">
+            <h2 className="text-xl font-semibold mb-2">No {categoryName} classes scheduled for today.</h2>
+            <p>Check the full schedule for other days.</p>
+          </div>
         )}
       </div>
-      
+
       {showCheckout && selectedSession && selectedVenue && (
         <CheckoutSheet
           session={selectedSession}
