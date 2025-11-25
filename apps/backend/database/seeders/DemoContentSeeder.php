@@ -149,8 +149,8 @@ class DemoContentSeeder extends Seeder
                 'price' => 80,
                 'credits' => 0,
                 'validity_months' => 1,
-                'category_name' => 'Yoga',
-                'venue_id' => null,
+                'class_type' => 'Yoga',
+                'venue' => 'Zen Yoga Loft',
             ],
             [
                 'name' => 'HIIT 10-Pack',
@@ -158,8 +158,8 @@ class DemoContentSeeder extends Seeder
                 'price' => 120,
                 'credits' => 10,
                 'validity_months' => 3,
-                'category_name' => 'HIIT',
-                'venue_id' => null,
+                'class_type' => 'HIIT',
+                'venue' => 'Pulse Fitness Studio',
             ],
             [
                 'name' => 'Ride Revolution 5-Pack',
@@ -167,13 +167,22 @@ class DemoContentSeeder extends Seeder
                 'price' => 90,
                 'credits' => 5,
                 'validity_months' => 2,
-                'category_name' => null,
-                'venue_id' => $venues['Ride Revolution']->id,
+                'class_type' => 'Cycling',
+                'venue' => 'Ride Revolution',
             ],
         ];
 
-        $packages = collect($packagesData)->mapWithKeys(function (array $data) {
-            $package = Package::updateOrCreate(['name' => $data['name']], $data);
+        $packages = collect($packagesData)->mapWithKeys(function (array $data) use ($venues, $classTypes) {
+            $payload = [
+                'description' => $data['description'],
+                'price' => $data['price'],
+                'credits' => $data['credits'],
+                'validity_months' => $data['validity_months'],
+                'venue_id' => $venues[$data['venue']]->id,
+                'class_type_id' => $classTypes[$data['class_type']]->id,
+            ];
+
+            $package = Package::updateOrCreate(['name' => $data['name']], $payload);
             return [$package->name => $package];
         });
 

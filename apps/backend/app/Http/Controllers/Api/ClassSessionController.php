@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\InteractsWithQueryParameters;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\Booking;
+use App\Models\Status;
+use App\Models\WaitlistEntry;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\ClassSessionStoreRequest;
@@ -17,21 +21,25 @@ class ClassSessionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $activeWaitlistStatusId = Status::idFor(WaitlistEntry::class, 'active');
+        $confirmedBookingStatusId = Status::idFor(Booking::class, 'confirmed');
+
         $query = ClassSession::with([
             'venue',
             'classType',
             'instructor',
-            'waitlistEntries' => function ($q) {
-                $q->where('status', 'active')
-                    ->orderBy('created_at')
+            'waitlistEntries' => function ($q) use ($activeWaitlistStatusId) {
+                $this->constrainStatus($q, $activeWaitlistStatusId);
+
+                $q->orderBy('created_at')
                     ->with('user:id,first_name,last_name,name,email');
             },
         ])->withCount([
-            'bookings as bookings_confirmed_count' => function ($q) {
-                $q->where('status', 'confirmed');
+            'bookings as bookings_confirmed_count' => function ($q) use ($confirmedBookingStatusId) {
+                $this->constrainStatus($q, $confirmedBookingStatusId);
             },
-            'waitlistEntries as waitlist_active_count' => function ($q) {
-                $q->where('status', 'active');
+            'waitlistEntries as waitlist_active_count' => function ($q) use ($activeWaitlistStatusId) {
+                $this->constrainStatus($q, $activeWaitlistStatusId);
             },
         ]);
 
@@ -74,48 +82,14 @@ class ClassSessionController extends Controller
             $session->save();
         }
 
-        $session->load([
-            'venue',
-            'classType',
-            'instructor',
-            'waitlistEntries' => function ($q) {
-                $q->where('status', 'active')
-                    ->orderBy('created_at')
-                    ->with('user:id,first_name,last_name,name,email');
-            },
-        ])
-            ->loadCount([
-                'bookings as bookings_confirmed_count' => function ($q) {
-                    $q->where('status', 'confirmed');
-                },
-                'waitlistEntries as waitlist_active_count' => function ($q) {
-                    $q->where('status', 'active');
-                },
-            ]);
+        $session = $this->loadSessionRelations($session);
 
         return response()->json($session, 201);
     }
 
     public function show(ClassSession $classSession): JsonResponse
     {
-        $classSession->load([
-            'venue',
-            'classType',
-            'instructor',
-            'waitlistEntries' => function ($q) {
-                $q->where('status', 'active')
-                    ->orderBy('created_at')
-                    ->with('user:id,first_name,last_name,name,email');
-            },
-        ])
-            ->loadCount([
-                'bookings as bookings_confirmed_count' => function ($q) {
-                    $q->where('status', 'confirmed');
-                },
-                'waitlistEntries as waitlist_active_count' => function ($q) {
-                    $q->where('status', 'active');
-                },
-            ]);
+        $classSession = $this->loadSessionRelations($classSession);
 
         return response()->json($classSession);
     }
@@ -138,24 +112,7 @@ class ClassSessionController extends Controller
             $classSession->save();
         }
 
-        $classSession->load([
-            'venue',
-            'classType',
-            'instructor',
-            'waitlistEntries' => function ($q) {
-                $q->where('status', 'active')
-                    ->orderBy('created_at')
-                    ->with('user:id,first_name,last_name,name,email');
-            },
-        ])
-            ->loadCount([
-                'bookings as bookings_confirmed_count' => function ($q) {
-                    $q->where('status', 'confirmed');
-                },
-                'waitlistEntries as waitlist_active_count' => function ($q) {
-                    $q->where('status', 'active');
-                },
-            ]);
+        $classSession = $this->loadSessionRelations($classSession);
 
         return response()->json($classSession);
     }
@@ -167,4 +124,39 @@ class ClassSessionController extends Controller
         return response()->json(status: 204);
     }
 
+    private function loadSessionRelations(ClassSession $classSession): ClassSession
+    {
+        $activeWaitlistStatusId = Status::idFor(WaitlistEntry::class, 'active');
+        $confirmedBookingStatusId = Status::idFor(Booking::class, 'confirmed');
+
+        $classSession->load([
+            'venue',
+            'classType',
+            'instructor',
+            'waitlistEntries' => function ($q) use ($activeWaitlistStatusId) {
+                $this->constrainStatus($q, $activeWaitlistStatusId);
+
+                $q->orderBy('created_at')
+                    ->with('user:id,first_name,last_name,name,email');
+            },
+        ])->loadCount([
+            'bookings as bookings_confirmed_count' => function ($q) use ($confirmedBookingStatusId) {
+                $this->constrainStatus($q, $confirmedBookingStatusId);
+            },
+            'waitlistEntries as waitlist_active_count' => function ($q) use ($activeWaitlistStatusId) {
+                $this->constrainStatus($q, $activeWaitlistStatusId);
+            },
+        ]);
+
+        return $classSession;
+    }
+
+    private function constrainStatus(Builder $query, ?int $statusId): void
+    {
+        if ($statusId) {
+            $query->where('status_id', $statusId);
+        } else {
+            $query->whereRaw('0 = 1');
+        }
+    }
 }

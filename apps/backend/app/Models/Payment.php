@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Booking;
-use App\Models\Status;
+use App\Models\Concerns\HasStatus;
 
 class Payment extends Model
 {
     use HasFactory;
+    use HasStatus;
 
     protected $fillable = [
         'booking_id',
@@ -25,13 +26,11 @@ class Payment extends Model
         'meta' => 'array',
     ];
 
+    protected $appends = ['status'];
+
     public function booking()
     {
         return $this->belongsTo(Booking::class);
     }
 
-    public function statusDefinition()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
 }

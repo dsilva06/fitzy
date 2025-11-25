@@ -22,8 +22,8 @@ class PackageStoreRequest extends FormRequest
             'price' => ['nullable', 'numeric', 'min:0'],
             'credits' => ['nullable', 'integer', 'min:0'],
             'validity_months' => ['nullable', 'integer', 'min:0'],
-            'category_name' => ['nullable', 'string', 'max:255'],
-            'venue_id' => ['nullable', 'exists:venues,id'],
+            'venue_id' => ['required', 'exists:venues,id'],
+            'class_type_id' => ['required', 'exists:class_types,id'],
         ];
     }
 }

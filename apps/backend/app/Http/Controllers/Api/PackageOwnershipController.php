@@ -19,7 +19,8 @@ class PackageOwnershipController extends Controller
     {
         $query = PackageOwnership::with(['package', 'package.venue']);
 
-        $this->applyFilters($query, $request, ['id', 'user_id', 'package_id', 'status']);
+        $this->applyFilters($query, $request, ['id', 'user_id', 'package_id']);
+        $this->applyStatusFilter($query, $request, PackageOwnership::class);
         $this->applySorting($query, $request, ['purchased_at', 'expires_at', 'created_at'], 'purchased_at');
         $this->applyLimit($query, $request);
 

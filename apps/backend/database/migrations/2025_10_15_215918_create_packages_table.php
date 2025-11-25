@@ -18,8 +18,8 @@ return new class extends Migration
             $table->decimal('price', 8, 2)->default(0);
             $table->unsignedInteger('credits')->default(0);
             $table->unsignedInteger('validity_months')->default(0);
-            $table->string('category_name')->nullable();
             $table->foreignId('venue_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('class_type_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
         });
     }

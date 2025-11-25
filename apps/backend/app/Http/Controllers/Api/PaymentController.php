@@ -19,7 +19,8 @@ class PaymentController extends Controller
     {
         $query = Payment::with('booking');
 
-        $this->applyFilters($query, $request, ['id', 'booking_id', 'status']);
+        $this->applyFilters($query, $request, ['id', 'booking_id']);
+        $this->applyStatusFilter($query, $request, Payment::class);
         $this->applySorting($query, $request, ['created_at'], 'created_at');
         $this->applyLimit($query, $request);
 

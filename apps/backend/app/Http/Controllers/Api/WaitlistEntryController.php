@@ -19,7 +19,8 @@ class WaitlistEntryController extends Controller
     {
         $query = WaitlistEntry::with(['session', 'session.venue']);
 
-        $this->applyFilters($query, $request, ['id', 'user_id', 'session_id', 'status']);
+        $this->applyFilters($query, $request, ['id', 'user_id', 'session_id']);
+        $this->applyStatusFilter($query, $request, WaitlistEntry::class);
         $this->applySorting($query, $request, ['created_at'], 'created_at');
         $this->applyLimit($query, $request);
 

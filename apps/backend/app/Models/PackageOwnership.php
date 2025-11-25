@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\Package;
-use App\Models\Status;
+use App\Models\Concerns\HasStatus;
 
 class PackageOwnership extends Model
 {
     use HasFactory;
+    use HasStatus;
 
     protected $fillable = [
         'user_id',
@@ -30,6 +31,8 @@ class PackageOwnership extends Model
         'expires_at' => 'datetime',
     ];
 
+    protected $appends = ['status'];
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -40,8 +43,4 @@ class PackageOwnership extends Model
         return $this->belongsTo(Package::class);
     }
 
-    public function statusDefinition()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
 }

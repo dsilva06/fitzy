@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\ClassSession;
 use App\Models\Payment;
-use App\Models\Status;
+use App\Models\Concerns\HasStatus;
 
 class Booking extends Model
 {
     use HasFactory;
+    use HasStatus;
 
     protected $fillable = [
         'user_id',
@@ -24,6 +25,8 @@ class Booking extends Model
     protected $casts = [
         'cancellation_deadline' => 'datetime',
     ];
+
+    protected $appends = ['status'];
 
     public function user()
     {
@@ -40,8 +43,4 @@ class Booking extends Model
         return $this->hasOne(Payment::class);
     }
 
-    public function statusDefinition()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
 }

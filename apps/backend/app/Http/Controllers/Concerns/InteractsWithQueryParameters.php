@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Models\Status;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 trait InteractsWithQueryParameters
 {
@@ -47,6 +49,38 @@ trait InteractsWithQueryParameters
         if ($request->filled('limit')) {
             $limit = max(1, (int) $request->query('limit'));
             $query->limit($limit);
+        }
+
+        return $query;
+    }
+
+    protected function applyStatusFilter(Builder $query, Request $request, string $modelClass, string $parameter = 'status'): Builder
+    {
+        $values = [];
+
+        if ($request->filled($parameter)) {
+            $values = array_merge($values, Arr::wrap($request->query($parameter)));
+        }
+
+        $filter = $request->query('filter');
+
+        if (is_array($filter) && array_key_exists($parameter, $filter)) {
+            $values = array_merge($values, Arr::wrap($filter[$parameter]));
+        }
+
+        $values = array_values(array_filter(array_unique($values)));
+
+        if (empty($values)) {
+            return $query;
+        }
+
+        $statusIds = array_values(array_filter(array_map(
+            fn ($value) => Status::idFor($modelClass, $value),
+            $values
+        )));
+
+        if (! empty($statusIds)) {
+            $query->whereIn('status_id', $statusIds);
         }
 
         return $query;

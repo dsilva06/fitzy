@@ -22,7 +22,15 @@ class VenueController extends Controller
         $user = $request->user();
 
         if (! $user || $user->role !== 'owner') {
-            $query->where('status', VenueStatus::Approved->value);
+            $approvedStatusId = Status::idFor(Venue::class, VenueStatus::Approved->value);
+
+            if ($approvedStatusId) {
+                $query->where('status_id', $approvedStatusId);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+        } else {
+            $this->applyStatusFilter($query, $request, Venue::class);
         }
 
         if ($request->boolean('with_admins')) {
@@ -33,7 +41,7 @@ class VenueController extends Controller
             $query->with(['venueAdmins' => fn ($adminQuery) => $adminQuery->orderBy('created_at')]);
         }
 
-        $this->applyFilters($query, $request, ['id', 'city', 'neighborhood', 'status']);
+        $this->applyFilters($query, $request, ['id', 'city', 'neighborhood']);
         $this->applySorting($query, $request, ['name', 'rating', 'created_at'], 'name');
         $this->applyLimit($query, $request);
 

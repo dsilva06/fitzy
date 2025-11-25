@@ -4,16 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Enums\VenueStatus;
 use App\Models\ClassSession;
 use App\Models\Package;
 use App\Models\Favorite;
-use App\Models\Status;
 use App\Models\User;
+use App\Models\Concerns\HasStatus;
 
 class Venue extends Model
 {
     use HasFactory;
+    use HasStatus;
 
     protected $fillable = [
         'name',
@@ -38,9 +38,7 @@ class Venue extends Model
         'approved_at' => 'datetime',
     ];
 
-    protected $attributes = [
-        'status' => VenueStatus::Pending->value,
-    ];
+    protected $appends = ['status'];
 
     public function sessions()
     {
@@ -67,8 +65,4 @@ class Venue extends Model
         return $this->hasMany(User::class)->where('role', 'venue_admin');
     }
 
-    public function statusDefinition()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Venue;
 use App\Models\PackageOwnership;
+use App\Models\ClassType;
 
 class Package extends Model
 {
@@ -17,8 +18,8 @@ class Package extends Model
         'price',
         'credits',
         'validity_months',
-        'category_name',
         'venue_id',
+        'class_type_id',
     ];
 
     protected $casts = [
@@ -26,6 +27,8 @@ class Package extends Model
         'credits' => 'integer',
         'validity_months' => 'integer',
     ];
+
+    protected $appends = ['category_name'];
 
     public function venue()
     {
@@ -35,5 +38,15 @@ class Package extends Model
     public function ownerships()
     {
         return $this->hasMany(PackageOwnership::class);
+    }
+
+    public function classType()
+    {
+        return $this->belongsTo(ClassType::class);
+    }
+
+    public function getCategoryNameAttribute(): ?string
+    {
+        return $this->classType?->name;
     }
 }

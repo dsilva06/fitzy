@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 use App\Models\ClassSession;
-use App\Models\Status;
+use App\Models\Concerns\HasStatus;
 
 class WaitlistEntry extends Model
 {
     use HasFactory;
+    use HasStatus;
 
     protected $fillable = [
         'user_id',
@@ -18,6 +19,8 @@ class WaitlistEntry extends Model
         'status',
         'status_id',
     ];
+
+    protected $appends = ['status'];
 
     public function user()
     {
@@ -29,8 +32,4 @@ class WaitlistEntry extends Model
         return $this->belongsTo(ClassSession::class, 'session_id');
     }
 
-    public function statusDefinition()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
 }

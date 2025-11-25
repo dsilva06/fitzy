@@ -21,7 +21,8 @@ class BookingController extends Controller
     {
         $query = Booking::with(['session', 'session.venue', 'session.classType']);
 
-        $this->applyFilters($query, $request, ['id', 'user_id', 'session_id', 'status']);
+        $this->applyFilters($query, $request, ['id', 'user_id', 'session_id']);
+        $this->applyStatusFilter($query, $request, Booking::class);
         $this->applySorting($query, $request, ['created_at'], 'created_at');
         $this->applyLimit($query, $request);
 
