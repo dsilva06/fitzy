@@ -19,6 +19,8 @@ class PaymentMethod extends Model
         'account_name',
         'email',
         'phone',
+        'bank_name',
+        'document_id',
         'is_default',
         'meta',
     ];
